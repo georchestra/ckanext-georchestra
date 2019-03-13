@@ -2,6 +2,7 @@ import ckan.plugins as plugins
 import ckan.model as model
 import ckan.plugins.toolkit as toolkit
 from hashlib import md5
+import logging
 
 HEADER_USERNAME = "sec-username"
 HEADER_ROLES = "sec-roles"
@@ -13,10 +14,14 @@ HEADER_TEL = "sec-tel"
 
 
 def auth_function_disabled(context, data_dict=None):
+    # TODO : consider to return true in some "sysadmin" context. For instance to create organization
     return {
         'success': False,
         'msg': 'Authentication is disabled on CKAN and is handled by geOrchestra.'
     }
+
+
+log = logging.getLogger(__name__)
 
 
 class GeorchestraPlugin(plugins.SingletonPlugin):
@@ -75,18 +80,61 @@ class GeorchestraPlugin(plugins.SingletonPlugin):
                     userdict)
 
             toolkit.c.user = username
+            psession=model.Session
+            #self.update_orgs(userdict)
         else:
             toolkit.c.user = None
+
+    # Update organizations associated to the user
+    def update_orgs(self, userdict):
+        # TODO
+        # 1. get list of orgs for this user using get_action('organization_list_for_user')
+        # 2. check if the current user's org is in the list. If not, create it
+        # 3. for the list - the current user's org, remove the user from the orgs
+        # 4. purge ophan orgs : this will be done by the sync_with_LDAP task
+
+        # update Organization info
+        orgs_list = toolkit.get_action('organization_list_for_user')(
+            {'model': model, 'session': model.Session, 'user': '', 'ignore_auth': True},
+            {'id': userdict['id']})
+        log.debug('user {1} belongs to {0} organizations'.format(len(orgs_list), userdict['name']))
+        for org in orgs_list:
+            log.info('belongs to org {0}'.format(org['display_name']))
+
+        headers = toolkit.request.headers
+        user_org_name = headers.get(HEADER_ORG)
+        # check if organization exists
+        try:
+            org_exists = toolkit.get_validator('group_id_or_name_exists')(
+                user_org_name,
+                {'model': model, 'session': model.Session, 'user': '', 'ignore_auth': True})
+
+            log.debug('organization exists ? {0}'.format(org_exists))
+        except toolkit.Invalid:
+            log.debug('organization exists ? nope')
+            #then create organization
+            #self.create_org(user_org_name, userdict)
+
+
+    #create a new organization
+    def create_org(self,user_org_name, userdict):
+        new_org = toolkit.get_action('organization_create')(
+            {},
+            {'name': user_org_name, 'ldap_allow':True })
+        return new_org
+
 
     # override auth functions
     def get_auth_functions(self):
         return {
             'user_create': auth_function_disabled,
+            'organization_create': auth_function_disabled,
             'group_create': auth_function_disabled
         }
 
     # IConfigurer
     def update_config(self, config_):
-        toolkit.add_template_directory(config_, 'templates')
+        pass
+        #toolkit.add_template_directory(config_, 'templates')
         # toolkit.add_public_directory(config_, 'public')
         # toolkit.add_resource('fanstatic', 'georchestra')
