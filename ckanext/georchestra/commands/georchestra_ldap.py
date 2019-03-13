@@ -1,12 +1,12 @@
 import logging
-import pylons
+import dateutil
+
+import ldap, ldap.filter
 from ckan.lib.cli import CkanCommand
 from ckan.plugins import toolkit
-from ckan import logic
-from logic import ValidationError
-import ldap, ldap.filter
-from ckan.common import config
-import dateutil
+from ckan.plugins.toolkit import config
+
+from ckanext.georchestra.commands.utils import organizations
 
 
 log = logging.getLogger()
@@ -56,26 +56,8 @@ class GeorchestraLDAPCommand(CkanCommand):
         self.sync_organizations()
         pass
 
-    def preseed(self):
-        """
-        Clean the ckan instance
-        create some common orgs, some deprecated ones and leave some uncreated
-        :return:
-        """
-        self.organization_create({'id':'fake', 'name':'fake'})
-        for org in ['psc', 'c2c', 'cra']:
-            try:
-                toolkit.get_action('organization_purge')(self.context, {'id': org})
-                log.debug("purged organization {0}".format(org))
-                org = toolkit.get_action('organization_show')(self.context, {'id': org})
-                log.debug("organization {0} already exists".format(org))
-            except logic.NotFound:
-                # Means the organization was not found => we create it
-                if org in ['c2c','psc']:
-                    self.organization_create({'id':org, 'name':org})
-
     def sync_organizations(self):
-        self.preseed()
+        organizations.preseed(self.context)
         ldap_orgs_list = self.get_ldap_orgs()
         ckan_orgs_names_list = self.get_ckan_orgs()
 
@@ -85,9 +67,9 @@ class GeorchestraLDAPCommand(CkanCommand):
         orgs_missing = [ el for el in ldap_orgs_list if el['id'] not in ckan_orgs_set ]
         orgs_deprecated = list( ckan_orgs_set - set([el['id'] for el in ldap_orgs_list]))
 
-        self.organizations_update(orgs_exist)
-        self.organizations_add(orgs_missing)
-        self.organizations_remove(orgs_deprecated)
+        organizations.update(self.context,orgs_exist)
+        organizations.add(self.context,orgs_missing)
+        organizations.remove(self.context,orgs_deprecated)
 
         log.debug("ok !")
 
@@ -181,72 +163,3 @@ class GeorchestraLDAPCommand(CkanCommand):
     def get_ckan_orgs(self):
         orgs = toolkit.get_action('organization_list')(self.context, {'limit': 1000, 'all_fields':False})
         return orgs
-
-    def organizations_update(self, orgs_list):
-        for org in orgs_list:
-            try:
-                #current_org = toolkit.get_action('organization_show')(self.context, {'id': org['id'], 'include_extras':True})
-                revisions = toolkit.get_action('organization_revision_list')(self.context,
-                                                                      {'id': org['id']})
-                # in order to be able to compare with LDAP timestamp, we need it to be seen as time-aware.
-                # TODO: check it is really UTC time always
-                #last_revision=dateutil.parser.parse(revisions[0]['timestamp']+'Z')
-                last_revision = dateutil.parser.parse('20190208085726Z')
-                if org['update_ts'] > last_revision:
-                    # then we update it
-                    log.debug("updating organization {0}".format(org['id']))
-                    current_org = toolkit.get_action('organization_patch')(self.context,
-                                                                          org)
-                log.debug("ok")
-            except:
-                log.error("Could not read organization {0} (should exist though".format(org))
-
-    def organizations_add(self, orgs_list):
-        # trick to solve this SQLalchemy flushing issue. It seems 'group' info stays present in the self.session and
-        # messes things up. Clearing the 'group' var seems to help.
-        self.context['group'] = None
-        for org in orgs_list:
-            self.organization_create(org)
-            log.debug("added organization {0}".format(org['id']))
-
-    def organizations_remove(self, orgs_list):
-        # TODO : check content and move all packages to a 'ghost' org before purging org
-        for org in orgs_list:
-            try:
-                toolkit.get_action('organization_purge')(self.context, {'id': org})
-                log.debug("purged organization {0}".format(org))
-            except:
-                log.error("could not purge organization {0}".format(org))
-
-    def organization_create(self, data_dict):
-        # Apply auth fix from https://github.com/datagovuk/ckanext-harvest/commit/f315f41c86cbde4a49ef869b6993598f8cb11e2d
-        # to error message Action function organization_show did not call its auth function
-        self.context.pop('__auth_audit', None)
-        try:
-            log.debug("creating organization {0}".format(data_dict['id']))
-            toolkit.get_action('organization_create')(self.context, data_dict)
-        except ValidationError, e:
-            log.error(e['name'])
-
-    def organization_delete(self, id):
-        # TODO : resolve bug, see comment underneath
-        """
-        Don't use it. It generates an error from sqlalchemy :
-        related attribute set' operation is not currently supported within the execution stage of the flush process
-        already reported and closed (https://github.com/ckan/ckan/issues/2017). See if I can identify it or propose a
-        reliable way to reproduce ut (seems pretty reliable right now : just run twice organization_delete then some
-        organization_create and it all goes weird. For instance, my preseed function was like this :
-        for org in ['psc', 'c2c', 'cra', 'fake']:
-            self.organization_delete(org)
-
-        self.organization_create("c2c", None))
-        self.organization_create("fake", None)
-        and it would not create c2c organization, after issuing the sqlalchemy error)
-        """
-        self.context.pop('__auth_audit', None)
-        try:
-            toolkit.get_action('organization_purge')(self.context, {'id': id})
-            log.debug("purged organization {0}".format(id))
-        except:
-            log.error("could not delete org {0}".format(id))
-
