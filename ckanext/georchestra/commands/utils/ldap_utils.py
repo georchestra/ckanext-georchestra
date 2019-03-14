@@ -122,7 +122,8 @@ def get_ldap_org_members(cnx, org):
                 'id': res[0][1]['uid'][0].decode('utf_8'),
                 'cn': res[0][1]['cn'][0].decode('utf_8'),
                 'about': res[0][1]['description'][0].decode('utf_8'),
-                'fullname:': res[0][1]['givenName'][0].decode('utf_8'),
+                'fullname': res[0][1]['givenName'][0].decode('utf_8'),
+                'display_name': res[0][1]['givenName'][0].decode('utf_8'),
                 'email': res[0][1]['mail'][0].decode('utf_8'),
                 'sn': res[0][1]['sn'][0].decode('utf_8'),
                 'password':'12345678'

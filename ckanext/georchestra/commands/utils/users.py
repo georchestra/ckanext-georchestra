@@ -7,9 +7,16 @@ log = logging.getLogger()
 
 
 def update(context, user, force_update=False):
-    # TODO: check timestamps to determine if we update or no
-    ckan_user = toolkit.get_action('user_update')(context, user)
-    log.debug("updated user {0}".format(user['id']))
+    # note : ckan does not provide revisions for user profile. This means we can't check timestamps.
+    # so we get the user's profile, and check for differences on synced attributes
+    ckan_user = toolkit.get_action('user_show')(context, {'id':user['id']})
+    diff = { k : ckan_user[k] for k in set(ckan_user)-set(user)}
+    check_fields=['id', 'name','email', 'about','fullname', 'display_name']
+    checks = [(ckan_user[f]!= user[f]) for f in check_fields]
+    needs_update=reduce(lambda x,y: x or y, checks)
+    if needs_update or force_update:
+        ckan_user = toolkit.get_action('user_update')(context, user)
+        log.debug("updated user {0}".format(user['id']))
     return ckan_user
 
 def add(context, orgs_list):
