@@ -6,27 +6,6 @@ from ckan.plugins import toolkit
 log = logging.getLogger()
 
 
-def preseed(context):
-    """
-    Clean the ckan instance
-    create some common orgs, some deprecated ones and leave some uncreated
-    :return:
-    """
-    create(context, {'id': 'fake', 'name': 'fake'})
-    # for org in ['psc', 'c2c', 'cra']:
-    for org in ['c2c']:
-        try:
-            toolkit.get_action('organization_purge')(context, {'id': org})
-            log.debug("purged organization {0}".format(org))
-            org = toolkit.get_action('organization_show')(context, {'id': org})
-            log.debug("organization {0} already exists".format(org))
-        except toolkit.ObjectNotFound:
-            # Means the organization was not found => we create it
-            if org in ['c2c', 'psc']:
-                create(context, {'id': org, 'name': org})
-        except Exception as e:
-            log.error(e, exc_info=True)
-
 def update(context, orgs_list, force_update=False):
     for org in orgs_list:
         try:
@@ -61,15 +40,19 @@ def remove(context, orgs_list):
             log.error("could not purge organization {0}".format(org))
 
 
-def create(context, data_dict):
+def create(context, user, org):
     # Apply auth fix from https://github.com/datagovuk/ckanext-harvest/commit/f315f41c86cbde4a49ef869b6993598f8cb11e2d
     # to error message Action function organization_show did not call its auth function
     context.pop('__auth_audit', None)
+    ckan_user = None
     try:
-        log.debug("creating organization {0}".format(data_dict['id']))
-        toolkit.get_action('organization_create')(context, data_dict)
+        ckan_user = toolkit.get_action('user_create')(context, user)
+        ckan_user = toolkit.get_action('organization_member_create')(context, {'id':org['id'], 'username': user['name'],
+                                                                               'role':'editor'})
+
     except Exception as e:
         log.error(e, exc_info=True)
+    return ckan_user
 
 
 def delete(context, id):
