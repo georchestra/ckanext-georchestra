@@ -118,8 +118,8 @@ def get_ldap_org_members(cnx, org):
                                       attrlist=None)
         user = {'dn': res[0][0].decode('utf_8'),
                 'uid': res[0][1]['uid'][0].decode('utf_8'),
-                'name': res[0][1]['uid'][0].decode('utf_8')+'2',
-                'id': res[0][1]['uid'][0].decode('utf_8')+'2',
+                'name': res[0][1]['uid'][0].decode('utf_8'),
+                'id': res[0][1]['uid'][0].decode('utf_8'),
                 'cn': res[0][1]['cn'][0].decode('utf_8'),
                 'about': res[0][1]['description'][0].decode('utf_8'),
                 'fullname:': res[0][1]['givenName'][0].decode('utf_8'),

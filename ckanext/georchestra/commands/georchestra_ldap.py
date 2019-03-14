@@ -80,25 +80,23 @@ class GeorchestraLDAPCommand(CkanCommand):
         roles = ldap_utils.get_roles_memberships(ldap_cnx)
 
         all_users_by_groups = self.get_ckan_members_by_groups(ldap_orgs_list)
+        # TODO: find a way to put apart sysadmin user used to run the command, at least
+        processed_userids = ['ckandev', 'ckan']
         for org in ldap_orgs_list:
             ldap_users_list = ldap_utils.get_ldap_org_members(ldap_cnx, org)
-            ckan_org_members_list = self.get_ckan_members_of_org(org)
-            for user in ldap_users_list:
-                #list the orgs he belongs in ckan
-                user_ckan_orgs = toolkit.get_action(
-                    'organization_list_for_user')(self.context, {'id':user['uid'], 'include_dataset_count': True})
-                if (len(user_ckan_orgs) > 1):
-                    raise Exception("oops")
-                elif (len(user_ckan_orgs) == 0):
-                    user_utils.create(self.context, user, org)
-                elif (user_ckan_orgs[0] == org['id']):
-                    user_utils.update(self.context, user, org)
-                else:
-                    user_utils.change_org(self.context, user, org)
-
-                log.debug("ok")
-            #users_exist = [ el for el in ldap_users_list if el['cn'] in ckan_org_members_list]
-            log.debug("ok")
+            for user in  ldap_users_list:
+                try:
+                    toolkit.get_action('user_show')(self.context, {'id':user['id']})
+                    # no exception means the user already exists in the DB
+                    user_utils.update(self.context, user)
+                except toolkit.ObjectNotFound:
+                    user_utils.create(self.context, user)
+                processed_userids.append(user['id'])
+        ckan_all_users = toolkit.get_action('user_list')(self.context, {'all_fields':False})
+        orphan_users = set(ckan_all_users)-set(processed_userids)
+        # TODO: remove orphan users but be careful not to remove, for instance, ckandev sysadmin user used to run this command
+        log.debug("there are {0} orphan users to remove".format(len(orphan_users)))
+        log.debug("ok")
 
     def get_ckan_orgs(self):
         orgs = toolkit.get_action('organization_list')(self.context, {'limit': 1000, 'all_fields':False})
