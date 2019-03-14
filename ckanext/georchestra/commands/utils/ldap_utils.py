@@ -88,24 +88,24 @@ def get_roles_memberships(cnx):
     :param cnx:
     :return: a dict of role entries with, for each entry, the list of members (their DN)
     """
-    ldap_roles_values = [config['ckanext.georchestra.role.sysadmin'],
-                         config['ckanext.georchestra.role.orgadmin'],
-                         config['ckanext.georchestra.role.editor']
-                         ]
-    ldap_filter = '(|'
-    for r in ldap_roles_values:
-        ldap_filter += '(cn=' + r + ')'
-    ldap_filter += ')'
+    ldap_roles_dict = {
+                        config['ckanext.georchestra.role.sysadmin']:'sysadmin',
+                        config['ckanext.georchestra.role.orgadmin']: 'admin',
+                        config['ckanext.georchestra.role.editor']: 'editor',
+                        'CKAN_MEMBER' : 'member'
+    }
+
+    ldap_filter = '(|'+''.join([ '(cn='+k+')' for k,v in ldap_roles_dict.iteritems()])+')'
     ldap_search_result = cnx.search_s(config['ckanext.georchestra.ldap.base_dn.roles'], ldap.SCOPE_ONELEVEL,
                                       filterstr=ldap_filter,
                                       attrlist=['cn', 'member', 'description'])
     roles = dict()
     for el in ldap_search_result:
-        roles[el[1]['cn'][0].decode('utf_8')] = el[1]['member']
-    log.debug("ok")
+        r = el[1]['cn'][0].decode('utf_8')
+        roles[ldap_roles_dict[r]] = el[1]['member']
     return roles
 
-def get_ldap_org_members(cnx, org):
+def get_ldap_org_members(cnx, org, roles):
     """
     Collect LDAP users members of the given organization
     (org is expected to ba a dict like provided by self.get_ldap_org with org['members'] list)
@@ -116,6 +116,7 @@ def get_ldap_org_members(cnx, org):
         res = cnx.search_s(member_dn, ldap.SCOPE_BASE,
                                       filterstr='(objectClass=person)',
                                       attrlist=None)
+        r = get_user_role(res[0][0].decode('utf_8'), roles)
         user = {'dn': res[0][0].decode('utf_8'),
                 'uid': res[0][1]['uid'][0].decode('utf_8'),
                 'name': res[0][1]['uid'][0].decode('utf_8'),
@@ -126,7 +127,14 @@ def get_ldap_org_members(cnx, org):
                 'display_name': res[0][1]['givenName'][0].decode('utf_8'),
                 'email': res[0][1]['mail'][0].decode('utf_8'),
                 'sn': res[0][1]['sn'][0].decode('utf_8'),
-                'password':'12345678'
+                'password':'12345678',
+                'role': get_user_role(res[0][0].decode('utf_8'), roles),
+                'sysadmin': (r=='sysadmin')
                 }
         ldap_users_list.append(user)
     return ldap_users_list
+
+def get_user_role(user_dn, roles):
+    user_roles = [k for k,v in roles.iteritems() if user_dn in v]
+
+    return user_roles[0] if user_roles else 'member'

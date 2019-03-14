@@ -74,6 +74,7 @@ def create(context, data_dict):
 
 def delete(context, id):
     # TODO : resolve bug, see comment underneath
+    #TODO: check if it could not be solved for instance by calling action('user_create') see https://github.com/ckan/ckan/blob/2.8/ckan/logic/action/create.py#L968
     """
     Don't use it. It generates an error from sqlalchemy :
     related attribute set' operation is not currently supported within the execution stage of the flush process

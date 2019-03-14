@@ -74,10 +74,10 @@ class GeorchestraPlugin(plugins.SingletonPlugin):
                 {'id': userdict['id']})
 
             # update user if necessary
-            if user_obj['email_hash'] != emailhash or user_obj['fullname'] != userdict['fullname']:
-                toolkit.get_action('user_update')(
-                    {'model': model, 'session': model.Session, 'user': None, 'ignore_auth': True},
-                    userdict)
+            #if user_obj['email_hash'] != emailhash or user_obj['fullname'] != userdict['fullname']:
+            #    toolkit.get_action('user_update')(
+            #        {'model': model, 'session': model.Session, 'user': None, 'ignore_auth': True},
+            #        userdict)
 
             toolkit.c.user = username
             psession=model.Session

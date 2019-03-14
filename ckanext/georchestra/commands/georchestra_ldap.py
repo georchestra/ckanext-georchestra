@@ -54,6 +54,7 @@ class GeorchestraLDAPCommand(CkanCommand):
         ldap_cnx= ldap_utils.get_ldap_connection()
         ldap_orgs_list = self.sync_organizations(ldap_cnx)
         self.sync_users(ldap_cnx, ldap_orgs_list)
+        #self.sync_membership(ldap_cnx)
 
 
     def sync_organizations(self, ldap_cnx):
@@ -79,24 +80,22 @@ class GeorchestraLDAPCommand(CkanCommand):
 
         roles = ldap_utils.get_roles_memberships(ldap_cnx)
 
-        all_users_by_groups = self.get_ckan_members_by_groups(ldap_orgs_list)
         # TODO: find a way to put apart sysadmin user used to run the command, at least
         processed_userids = ['ckandev', 'ckan']
         for org in ldap_orgs_list:
-            ldap_users_list = ldap_utils.get_ldap_org_members(ldap_cnx, org)
+            ldap_users_list = ldap_utils.get_ldap_org_members(ldap_cnx, org, roles)
             for user in  ldap_users_list:
                 try:
                     toolkit.get_action('user_show')(self.context, {'id':user['id']})
                     # no exception means the user already exists in the DB
-                    user_utils.update(self.context, user)
+                    user_utils.update(self.context, user, org)
                 except toolkit.ObjectNotFound:
-                    user_utils.create(self.context, user)
+                    user_utils.create(self.context, user, org)
                 processed_userids.append(user['id'])
         ckan_all_users = toolkit.get_action('user_list')(self.context, {'all_fields':False})
         orphan_users = set(ckan_all_users)-set(processed_userids)
         # TODO: remove orphan users but be careful not to remove, for instance, ckandev sysadmin user used to run this command
         log.debug("there are {0} orphan users to remove".format(len(orphan_users)))
-        log.debug("ok")
 
     def get_ckan_orgs(self):
         orgs = toolkit.get_action('organization_list')(self.context, {'limit': 1000, 'all_fields':False})
@@ -106,8 +105,3 @@ class GeorchestraLDAPCommand(CkanCommand):
         users = toolkit.get_action('member_list')(self.context, {'id':org['id'], 'object_type': 'user'})
         return users
 
-    def get_ckan_members_by_groups(self, orgs_list):
-        # This toolkit action doesn't seem to work... I get an empty list
-        groups_with_members = toolkit.get_action('organization_list')(self.context, {'limit':1000, 'all_fields':True,
-                                                                                     'include_users':True})
-        return groups_with_members
