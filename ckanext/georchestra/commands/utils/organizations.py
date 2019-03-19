@@ -2,6 +2,7 @@ import logging
 import dateutil
 
 from ckan.plugins import toolkit
+from ckan import model
 
 log = logging.getLogger()
 
@@ -40,6 +41,7 @@ def update(context, orgs_list, force_update=False):
                 # then we update it
                 log.debug("updating organization {0}".format(org['id']))
                 current_org = toolkit.get_action('organization_patch')(context, org)
+                flush()
         except:
             log.error("Could not read organization {0} (should exist though".format(org))
 
@@ -56,6 +58,7 @@ def remove(context, orgs_list):
     for org in orgs_list:
         try:
             toolkit.get_action('organization_purge')(context, {'id': org})
+            flush()
             log.debug("purged organization {0}".format(org))
         except:
             log.error("could not purge organization {0}".format(org))
@@ -68,6 +71,7 @@ def create(context, data_dict):
     try:
         log.debug("creating organization {0}".format(data_dict['id']))
         toolkit.get_action('organization_create')(context, data_dict)
+        flush()
     except Exception as e:
         log.error(e, exc_info=True)
 
@@ -92,6 +96,11 @@ def delete(context, id):
     context.pop('__auth_audit', None)
     try:
         toolkit.get_action('organization_purge')(context, {'id': id})
+        flush()
         log.debug("purged organization {0}".format(id))
     except Exception as e:
         log.error(e, exc_info=True)
+
+def flush():
+    model.Session.commit()
+    model.Session.remove()
