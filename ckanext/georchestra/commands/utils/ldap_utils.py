@@ -76,7 +76,8 @@ def get_ldap_orgs(cnx):
             if res[0][0].startswith('o='):
                 org['description'] = res[0][1]['description'][0]
             else:
-                # org['image_url'] =  res[0][1]['jpegPhoto'][0]
+                #TODO retrieve the image data and try to store it as base64 encoded URL
+                # org['image_url'] =  'data:image/jpeg;base64, '+res[0][1]['jpegPhoto'][0]
                 pass
         ldap_orgs_list.append(org)
 
@@ -129,7 +130,8 @@ def get_ldap_org_members(cnx, org, roles):
                 'sn': res[0][1]['sn'][0].decode('utf_8'),
                 'password':'12345678',
                 'role': get_user_role(res[0][0].decode('utf_8'), roles),
-                'sysadmin': (r=='sysadmin')
+                'sysadmin': (r=='sysadmin'),
+                'state': 'active'
                 }
         ldap_users_list.append(user)
     return ldap_users_list

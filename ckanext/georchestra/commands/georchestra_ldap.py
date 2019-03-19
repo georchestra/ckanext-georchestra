@@ -4,6 +4,7 @@ import dateutil
 from ckan.lib.cli import CkanCommand
 from ckan.plugins import toolkit
 from ckan.plugins.toolkit import config
+from ckan import model
 
 from ckanext.georchestra.commands.utils import ldap_utils
 from ckanext.georchestra.commands.utils import organizations as org_utils
@@ -80,22 +81,25 @@ class GeorchestraLDAPCommand(CkanCommand):
 
         roles = ldap_utils.get_roles_memberships(ldap_cnx)
 
-        # TODO: find a way to put apart sysadmin user used to run the command, at least
-        processed_userids = ['ckandev', 'ckan']
+        # keep root sysadmin users (like the one running this current command) out of the sync process (we don't want
+        # them removed...)
+        processed_userids = config['ckanext.georchestra.external_users'].split(",")
         for org in ldap_orgs_list:
             ldap_users_list = ldap_utils.get_ldap_org_members(ldap_cnx, org, roles)
             for user in  ldap_users_list:
                 try:
-                    toolkit.get_action('user_show')(self.context, {'id':user['id']})
+                    u = toolkit.get_action('user_show')(self.context, {'id':user['id']})
                     # no exception means the user already exists in the DB
-                    user_utils.update(self.context, user, org)
+                    user_utils.update(self.context, user, u, org)
+                    processed_userids.append(user['id'])
                 except toolkit.ObjectNotFound:
                     user_utils.create(self.context, user, org)
-                processed_userids.append(user['id'])
+                    processed_userids.append(user['id'])
         ckan_all_users = toolkit.get_action('user_list')(self.context, {'all_fields':False})
         orphan_users = set(ckan_all_users)-set(processed_userids)
-        # TODO: remove orphan users but be careful not to remove, for instance, ckandev sysadmin user used to run this command
         log.debug("there are {0} orphan users to remove".format(len(orphan_users)))
+        for orphan in orphan_users:
+            self.delete_user(orphan, config['ckanext.georchestra.orphans.users.purge'])
 
     def get_ckan_orgs(self):
         orgs = toolkit.get_action('organization_list')(self.context, {'limit': 1000, 'all_fields':False})
@@ -105,3 +109,22 @@ class GeorchestraLDAPCommand(CkanCommand):
         users = toolkit.get_action('member_list')(self.context, {'id':org['id'], 'object_type': 'user'})
         return users
 
+    def delete_user(self, id, purge=True):
+        """
+        remove a user from the users list
+        :param id(string): id of the user to delete
+        :param purge (Boolean): purge or simply set as 'state':'deleted'. (optional, default:True)
+        :return:
+        """
+        try:
+            if purge:
+                # toolkit.get_action('user_delete')(self.context, {'id': orphan})
+                # Beware : user_delete doesn't purge the user, it just shows it as deleted state.
+                # This is how to do it (cf https://stackoverflow.com/questions/33881318/how-to-completely-delete-a-ckan-user)
+                model.User.get(id).purge()
+                model.Session.commit()
+                model.Session.remove()
+            else:
+                toolkit.get_action('user_delete')(self.context, {'id': orphan})
+        except toolkit.ObjectNotFound, e:
+            log.error("Not found orphan user when trying to remove it: {0}".format(e))

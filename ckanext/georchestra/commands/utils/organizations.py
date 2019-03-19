@@ -87,6 +87,7 @@ def delete(context, id):
     self.organization_create("c2c", None))
     self.organization_create("fake", None)
     and it would not create c2c organization, after issuing the sqlalchemy error)
+    I may have a lead looking at https://github.com/ckan/ckan/blob/master/ckan/logic/action/create.py#L964
     """
     context.pop('__auth_audit', None)
     try:
