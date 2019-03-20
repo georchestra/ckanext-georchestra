@@ -93,19 +93,19 @@ class GeorchestraLDAPCommand(CkanCommand):
         # keep root sysadmin users (like the one running this current command) out of the sync process (we don't want
         # them removed...)
         processed_userids = config['ckanext.georchestra.external_users'].split(",")
-        for org in ldap_orgs_list:
-            ldap_users_list = ldap_utils.get_ldap_org_members(ldap_cnx, org, roles)
+        for ldap_org in ldap_orgs_list:
+            ldap_users_list = ldap_utils.get_ldap_org_members(ldap_cnx, ldap_org, roles)
             #TODO: see if we shouldn't use instead toolkit.get_action('organization_list')(self.context, {'limit': 1000, 'all_fields':True, 'include_users':True, 'organizations':[org['id']]})
             #to get a list of the users with capacity information
-            for user in  ldap_users_list:
+            for ldap_user in  ldap_users_list:
                 try:
-                    log.debug("checking user {0}".format(user['id']))
-                    u = toolkit.get_action('user_show')(self.context, {'id':user['id']})
+                    log.debug("checking user {0}".format(ldap_user['id']))
+                    ckan_user = toolkit.get_action('user_show')(self.context, {'id':ldap_user['id']})
                     # no exception means the user already exists in the DB
-                    user_utils.update(self.context, user, u, org)
+                    user_utils.update(self.context, ldap_user, ckan_user, ldap_org)
                 except toolkit.ObjectNotFound:
-                    user_utils.create(self.context, user, org)
-                processed_userids.append(user['id'])
+                    user_utils.create(self.context, ldap_user, ldap_org)
+                processed_userids.append(ldap_user['id'])
                 #Hack to prevent errors in next action('user_show'):
                 self.context['user_obj']=None
                 self.context['with_capacity']=False
