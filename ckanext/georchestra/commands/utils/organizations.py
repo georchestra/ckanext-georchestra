@@ -17,9 +17,9 @@ def preseed(context):
     # for org in ['psc', 'c2c', 'cra']:
     for org in ['c2c']:
         try:
-            toolkit.get_action('organization_purge')(context, {'id': org})
+            toolkit.get_action('organization_purge')(context.copy(), {'id': org})
             log.debug("purged organization {0}".format(org))
-            org = toolkit.get_action('organization_show')(context, {'id': org})
+            org = toolkit.get_action('organization_show')(context.copy(), {'id': org})
             log.debug("organization {0} already exists".format(org))
         except toolkit.ObjectNotFound:
             # Means the organization was not found => we create it
@@ -32,7 +32,7 @@ def update(context, orgs_list, force_update=False):
     for org in orgs_list:
         try:
             #current_org = toolkit.get_action('organization_show')(context, {'id': org['id'], 'include_extras':True})
-            revisions = toolkit.get_action('organization_revision_list')(context, {'id': org['id']})
+            revisions = toolkit.get_action('organization_revision_list')(context.copy(), {'id': org['id']})
             # in order to be able to compare with LDAP timestamp, we need it to be seen as time-aware.
             # TODO: check it is really UTC time always
             last_revision = dateutil.parser.parse(revisions[0]['timestamp']+'Z')
@@ -40,8 +40,7 @@ def update(context, orgs_list, force_update=False):
             if (org['update_ts'] > last_revision) or force_update:
                 # then we update it
                 log.debug("updating organization {0}".format(org['id']))
-                current_org = toolkit.get_action('organization_patch')(context, org)
-                flush()
+                current_org = toolkit.get_action('organization_patch')(context.copy(), org)
         except:
             log.error("Could not read organization {0} (should exist though".format(org))
 
@@ -57,8 +56,7 @@ def remove(context, orgs_list):
     # TODO : check content and move all packages to a 'ghost' org before purging org
     for org in orgs_list:
         try:
-            toolkit.get_action('organization_purge')(context, {'id': org})
-            flush()
+            toolkit.get_action('organization_purge')(context.copy(), {'id': org})
             log.debug("purged organization {0}".format(org))
         except:
             log.error("could not purge organization {0}".format(org))
@@ -70,8 +68,7 @@ def create(context, data_dict):
     context.pop('__auth_audit', None)
     try:
         log.debug("creating organization {0}".format(data_dict['id']))
-        toolkit.get_action('organization_create')(context, data_dict)
-        flush()
+        toolkit.get_action('organization_create')(context.copy(), data_dict)
     except Exception as e:
         log.error(e, exc_info=True)
 
@@ -95,7 +92,7 @@ def delete(context, id):
     """
     context.pop('__auth_audit', None)
     try:
-        toolkit.get_action('organization_purge')(context, {'id': id})
+        toolkit.get_action('organization_purge')(context.copy(), {'id': id})
         flush()
         log.debug("purged organization {0}".format(id))
     except Exception as e:

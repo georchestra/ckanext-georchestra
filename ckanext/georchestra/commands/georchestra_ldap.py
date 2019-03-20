@@ -40,6 +40,7 @@ class GeorchestraLDAPCommand(CkanCommand):
 
         # Set up context
         user = toolkit.get_action('get_site_user')({'ignore_auth': True}, {})
+        self.site_user_name=user['name']
         self.context = {'user': user['name']}
 
         cmd = self.args[0]
@@ -59,7 +60,7 @@ class GeorchestraLDAPCommand(CkanCommand):
 
 
     def sync_organizations(self, ldap_cnx):
-        org_utils.preseed(self.context)
+        org_utils.preseed(self.clean_context())
         ldap_orgs_list = ldap_utils.get_ldap_orgs(ldap_cnx)
         ckan_orgs_names_list = self.get_ckan_orgs()
 
@@ -69,9 +70,9 @@ class GeorchestraLDAPCommand(CkanCommand):
         orgs_missing = [ el for el in ldap_orgs_list if el['id'] not in ckan_orgs_set ]
         orgs_deprecated = list( ckan_orgs_set - set([el['id'] for el in ldap_orgs_list]))
 
-        org_utils.update(self.context,orgs_exist, force_update=self.is_dev_mode)
-        org_utils.add(self.context,orgs_missing)
-        org_utils.remove(self.context,orgs_deprecated)
+        org_utils.update(self.clean_context(),orgs_exist, force_update=self.is_dev_mode)
+        org_utils.add(self.clean_context(),orgs_missing)
+        org_utils.remove(self.clean_context(),orgs_deprecated)
 
         log.debug("orgs sync ok !")
         return ldap_orgs_list
@@ -100,25 +101,26 @@ class GeorchestraLDAPCommand(CkanCommand):
             for ldap_user in  ldap_users_list:
                 try:
                     log.debug("checking user {0}".format(ldap_user['id']))
-                    ckan_user = toolkit.get_action('user_show')(self.context, {'id':ldap_user['id']})
+                    ckan_user = toolkit.get_action('user_show')(self.clean_context(), {'id':ldap_user['id']})
                     # no exception means the user already exists in the DB
-                    user_utils.update(self.context, ldap_user, ckan_user, ldap_org)
+                    user_utils.update(self.clean_context(), ldap_user, ckan_user, ldap_org)
                 except toolkit.ObjectNotFound:
-                    user_utils.create(self.context, ldap_user, ldap_org)
+                    user_utils.create(self.clean_context(), ldap_user, ldap_org)
                 processed_userids.append(ldap_user['id'])
-                #Hack to prevent errors in next action('user_show'):
-                self.context['user_obj']=None
-                self.context['with_capacity']=False
-        ckan_all_users = toolkit.get_action('user_list')(self.context, {'all_fields':False})
+
+        ckan_all_users = toolkit.get_action('user_list')(self.clean_context(), {'all_fields':False})
         orphan_users = set(ckan_all_users)-set(processed_userids)
         log.debug("there are {0} orphan users to remove".format(len(orphan_users)))
         for orphan in orphan_users:
-            user_utils.delete(slef.context, orphan, config['ckanext.georchestra.orphans.users.purge'])
+            user_utils.delete(self.clean_context(), orphan, config['ckanext.georchestra.orphans.users.purge'])
 
     def get_ckan_orgs(self):
-        orgs = toolkit.get_action('organization_list')(self.context, {'limit': 1000, 'all_fields':False})
+        orgs = toolkit.get_action('organization_list')(self.clean_context(), {'limit': 1000, 'all_fields':False})
         return orgs
 
     def get_ckan_members_of_org(self, org):
-        users = toolkit.get_action('member_list')(self.context, {'id':org['id'], 'object_type': 'user'})
+        users = toolkit.get_action('member_list')(self.clean_context(), {'id':org['id'], 'object_type': 'user'})
         return users
+
+    def clean_context(self):
+        return {'user': self.site_user_name}

@@ -18,33 +18,30 @@ def update(context, ldap_user, ckan_user, org, force_update=False):
     checks = [(ckan_user[f] != ldap_user[f]) for f in check_fields]
     needs_update=reduce(lambda x,y: x or y, checks)
     if needs_update or force_update:
-        ckan_user = toolkit.get_action('user_update')(context, ldap_user)
-        flush()
+        ckan_user = toolkit.get_action('user_update')(context.copy(), ldap_user)
         log.debug("updated user {0}".format(ldap_user['id']))
 
     # Update user membership to organizations
     if (ldap_user['role']!= 'sysadmin'):
         updated_membership = False
         # Update membership on all organizations he belongs
-        user_orgs_list = toolkit.get_action('organization_list_for_user')(context, {'id':ldap_user['id']})
+        user_orgs_list = toolkit.get_action('organization_list_for_user')(context.copy(), {'id':ldap_user['id']})
         for o in user_orgs_list:
             log.debug("updating user {0} membership for organization {1}".format(ldap_user['id'], o['id']))
             if o['id'] == org['id']:
                 if o['capacity'] != ldap_user['role']:
                     log.debug("changed {0} role for ".format(ldap_user['id'], o['id']))
-                    toolkit.get_action('organization_member_create')(context,
+                    toolkit.get_action('organization_member_create')(context.copy(),
                                                                      {'id': org['id'], 'username': ldap_user['id'],
                                                                       'role':ldap_user['role']})
-                    flush()
                 updated_membership=True
             else:
                 log.debug("removing user {0} from organization {1}".format(ldap_user['id'], o['id']))
-                toolkit.get_action('organization_member_delete')(context, {'id': org['id'],
+                toolkit.get_action('organization_member_delete')(context.copy(), {'id': org['id'],
                                                                            'username': ldap_user['id']})
-                flush()
         # He not not have belonged to the current org. This is dealt with here
         if not updated_membership:
-            toolkit.get_action('organization_member_create')(context,
+            toolkit.get_action('organization_member_create')(context.copy(),
                                                              {'id': org['id'], 'username': ldap_user['name'],
                                                               'role': ldap_user['role']})
 
@@ -57,14 +54,13 @@ def create(context, user, org):
     ckan_user = None
     try:
         # create user
-        ckan_user = toolkit.get_action('user_create')(context, user)
+        ckan_user = toolkit.get_action('user_create')(context.copy(), user)
         log.debug("created user {0}".format(user['id']))
 
         if (user['role'] != 'sysadmin'):
             # add it as member of the organization
-            toolkit.get_action('organization_member_create')(context, {'id': org['id'], 'username': user['id'],
+            toolkit.get_action('organization_member_create')(context.copy(), {'id': org['id'], 'username': user['id'],
                                                                        'role': user['role']})
-            flush()
     except Exception as e:
         log.error(e, exc_info=True)
     return ckan_user
@@ -84,7 +80,7 @@ def delete(context, id, purge=True):
             model.User.get(id).purge()
             flush()
         else:
-            toolkit.get_action('user_delete')(context, {'id': id})
+            toolkit.get_action('user_delete')(context.copy(), {'id': id})
     except toolkit.ObjectNotFound, e:
         log.error("Not found orphan user when trying to remove it: {0}".format(e))
 
