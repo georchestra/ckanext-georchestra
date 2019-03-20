@@ -25,23 +25,25 @@ def update(context, user, ckan_user,org, force_update=False):
     # Update user membership to organizations
     if (user['role']!='sysadmin'):
         #TODO: check if role changed
+        updated_membership = False
         user_orgs_list = toolkit.get_action('organization_list_for_user')(context, {'id':user['id']})
-        toolkit.get_action('organization_member_create')(context,
-                                                         {'id': org['id'], 'username': user['id'],
-                                                          'role': user['role']})
         for o in user_orgs_list:
             log.debug("updating user {0} membership for organization {1}".format(user['id'], o['id']))
             if o['id'] == org['id']:
-                log.debug("making user {0} member of organization {1}".format(user['id'], o['id']))
                 if o['capacity'] != user['role']:
                     log.debug("changed {0} role for ".format(user['id'], o['id']))
                     toolkit.get_action('organization_member_create')(context,
                                                      {'id': org['id'], 'username': user['id'], 'role':user['role']})
                     flush()
+                updated_membership=True
             else:
                 log.debug("removing user {0} from organization {1}".format(user['id'], o['id']))
                 toolkit.get_action('organization_member_delete')(context, {'id': org['id'], 'username': user['id']})
                 flush()
+        if not updated_membership:
+            toolkit.get_action('organization_member_create')(context,
+                                                         {'id': org['id'], 'username': user['name'],
+                                                          'role': user['role']})
 
     return ckan_user
 

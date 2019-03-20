@@ -106,6 +106,9 @@ class GeorchestraLDAPCommand(CkanCommand):
                 except toolkit.ObjectNotFound:
                     user_utils.create(self.context, user, org)
                 processed_userids.append(user['id'])
+                #Hack to prevent errors in next action('user_show'):
+                self.context['user_obj']=None
+                self.context['with_capacity']=False
         ckan_all_users = toolkit.get_action('user_list')(self.context, {'all_fields':False})
         orphan_users = set(ckan_all_users)-set(processed_userids)
         log.debug("there are {0} orphan users to remove".format(len(orphan_users)))
