@@ -1,7 +1,9 @@
 import logging
 import dateutil
+import re
 
 import ldap, ldap.filter
+from ldap.controls.libldap import SimplePagedResultsControl
 
 from ckan.plugins.toolkit import config
 
@@ -48,95 +50,223 @@ def get_ldap_connection():
     return cnx
 
 
-def get_ldap_orgs(cnx):
+def orgs_scan_and_process(cnx, process, context):
     """
-    Get LDAP organization list
-    :return:
+    Retrieve every LDAP organization and apply the 'process' on each entry
+    Search is paginated to support more than 1000 entries
+    :param cnx: LDAP connection
+    :param process (function): the function to apply to each LDAP entry returned by the search
+    :return: the list of the org names that have been processed
     """
-    ldap_search_result = cnx.search_s(config['ckanext.georchestra.ldap.base_dn.orgs'], ldap.SCOPE_ONELEVEL,
-                                      filterstr='(objectClass=groupOfMembers)',
-                                      attrlist=['dn', 'cn', 'o', 'member', 'seeAlso', 'modifytimestamp'])
-    ldap_orgs_list = []
-    for elt in ldap_search_result:
-        org = {'name': elt[1]['cn'][0].decode('utf_8'),
-               'id': elt[1]['cn'][0].decode('utf_8'),
-               'title': elt[1]['o'][0].decode('utf_8'),
-               'update_ts': dateutil.parser.parse(elt[1]['modifyTimestamp'][0].decode('utf_8'))
-               }
-        members = elt[1]['member']
-        members_list = []
-        for member in members:
-            members_list.append(member)
-        org['members'] = members_list
+    # Create the page control to work from
+    page_control = SimplePagedResultsControl(True, size=1000, cookie='')
 
-        see_also_links = elt[1]['seeAlso']
-        for link in see_also_links:
-            res = cnx.search_s(link, ldap.SCOPE_BASE,
-                               filterstr='(objectClass=*)', attrlist=None)
-            if res[0][0].startswith('o='):
-                org['description'] = res[0][1]['description'][0]
-            else:
-                #TODO retrieve the image data and try to store it as base64 encoded URL
-                # org['image_url'] =  'data:image/jpeg;base64, '+res[0][1]['jpegPhoto'][0]
-                pass
-        ldap_orgs_list.append(org)
+    result = []
+    pages = 0
+    processed_orgs=[]
+    # Do searches until we run out of "pages" to get from
+    # the LDAP server.
+    while True:
+        pages += 1
+        # Send search request
+        try:
+            response = cnx.search_ext(config['ckanext.georchestra.ldap.base_dn.orgs'],
+                                  ldap.SCOPE_ONELEVEL,
+                                  '(objectClass=groupOfMembers)',
+                                  attrlist=['dn', 'cn', 'o', 'member', 'seeAlso', 'modifytimestamp'],
+                                  serverctrls=[page_control])
+        except ldap.LDAPError as e:
+            log.error('LDAP search failed: %s' % e)
 
-    return ldap_orgs_list
+        # Pull the results from the search request
+        try:
+            rtype, rdata, rmsgid, serverctrls = cnx.result3(response)
+        except ldap.LDAPError as e:
+            log.error('Could not pull LDAP results: %s' % e)
 
-def get_roles_memberships(cnx):
+        # Each "rdata" is a tuple of the form (dn, attrs), where dn is
+        # a string containing the DN (distinguished name) of the entry,
+        # and attrs is a dictionary containing the attributes associated
+        # with the entry. The keys of attrs are strings, and the associated
+        # values are lists of strings.
+        for org in rdata:
+            org = org_format_and_complete(cnx, org)
+            process(context, org)
+            processed_orgs.append(org['id'])
+
+        # Get cookie for next request
+        result.extend(rdata)
+        controls = [control for control in serverctrls
+                    if control.controlType == SimplePagedResultsControl.controlType]
+        if not controls:
+            print('The server ignores RFC 2696 control')
+            break
+
+        # Ok, we did find the page control, yank the cookie from it and
+        # insert it into the control for our next search. If however there
+        # is no cookie, we are done!
+
+        page_control.cookie = controls[0].cookie
+        if not controls[0].cookie:
+            break
+    return processed_orgs
+
+
+def org_format_and_complete(cnx, org):
     """
-    Collect the CKAN roles defined in the LDAP
-    :param cnx:
-    :return: a dict of role entries with, for each entry, the list of members (their DN)
+    Gets complementary attributes from LDAP (organization information is split into 3 objects)
+    :param org:
+    :return:formatted organization dict, compliant with CKAN
     """
+
+    # Split the org tuple
+    dn, attr = org
+    organization = {'dn':dn,
+                    'name': attr['cn'][0],
+                    'id'  : attr['cn'][0],
+                    'title': attr['o'][0],
+                    'update_ts':dateutil.parser.parse(attr['modifyTimestamp'][0])}
+
+    see_also_links = attr['seeAlso']
+    for link in see_also_links:
+        res = cnx.search_s(link, ldap.SCOPE_BASE,
+                           filterstr='(objectClass=*)', attrlist=None)
+        if res[0][0].startswith('o='):
+            organization['description'] = res[0][1]['description'][0]
+        else:
+            #TODO retrieve the image data and try to store it as base64 encoded URL
+            # org['image_url'] =  'data:image/jpeg;base64, '+res[0][1]['jpegPhoto'][0]
+            pass
+
+    return organization
+
+
+def users_scan_and_process(cnx, process, context):
+    """
+    Retrieve every LDAP user and apply the 'process' on each entry
+    Search is paginated to support more than 1000 entries
+    :param cnx: LDAP connection
+    :param process (function): the function to apply to each LDAP entry returned by the search
+    :return: the list of the user names that have been processed
+    """
+    nosync_users_list = config['ckanext.georchestra.ldap.users.nosync'].split(",")
+
+    # Create the page control to work from
+    page_control = SimplePagedResultsControl(True, size=1000, cookie='')
+
+    result = []
+    pages = 0
+    processed_users=[]
+    # Do searches until we run out of "pages" to get from
+    # the LDAP server.
+    while True:
+        pages += 1
+        # Send search request
+        try:
+            response = cnx.search_ext(config['ckanext.georchestra.ldap.base_dn.users'],
+                                  ldap.SCOPE_ONELEVEL,
+                                  '(objectClass=organizationalPerson)',
+                                  attrlist=None,
+                                  serverctrls=[page_control])
+        except ldap.LDAPError as e:
+            log.error('LDAP search failed: %s' % e)
+
+        # Pull the results from the search request
+        try:
+            rtype, rdata, rmsgid, serverctrls = cnx.result3(response)
+        except ldap.LDAPError as e:
+            log.error('Could not pull LDAP results: %s' % e)
+
+        # Each "rdata" is a tuple of the form (dn, attrs), where dn is
+        # a string containing the DN (distinguished name) of the entry,
+        # and attrs is a dictionary containing the attributes associated
+        # with the entry. The keys of attrs are strings, and the associated
+        # values are lists of strings.
+        for user in rdata:
+            #filter out nosync users like geoserver_privileged_user
+            if user[1]['uid'][0] in nosync_users_list:
+                continue
+            user = user_format_and_complete(cnx, user)
+            process(context, user)
+            processed_users.append(user['id'])
+
+        # Get cookie for next request
+        result.extend(rdata)
+        controls = [control for control in serverctrls
+                    if control.controlType == SimplePagedResultsControl.controlType]
+        if not controls:
+            print('The server ignores RFC 2696 control')
+            break
+
+        # Ok, we did find the page control, yank the cookie from it and
+        # insert it into the control for our next search. If however there
+        # is no cookie, we are done!
+
+        page_control.cookie = controls[0].cookie
+        if not controls[0].cookie:
+            break
+    return processed_users
+
+def user_format_and_complete(cnx, user):
+    """
+    Add role information from LDAP
+    Warning : does not support pagination: we suppose a given user will have less than 1000 roles !
+    :param user:
+    :return: formatted user dict, compliant with CKAN
+    """
+    dn, attr = user
+    user_dict = {'dn': dn,
+                 'uid': attr['uid'][0],
+                 'name': attr['uid'][0],
+                 'id': attr['uid'][0],
+                 'cn': attr['cn'][0],
+                 'about': attr['description'][0],
+                 'fullname': attr['givenName'][0],
+                 'display_name': attr['givenName'][0],
+                 'email': attr['mail'][0],
+                 'sn': attr['sn'][0],
+                 'password': '12345678',
+                 'state': 'active',
+                 'sysadmin': False,
+                 'role': 'member'
+                }
+
     ldap_roles_dict = {
-                        config['ckanext.georchestra.role.sysadmin']:'sysadmin',
-                        config['ckanext.georchestra.role.orgadmin']: 'admin',
-                        config['ckanext.georchestra.role.editor']: 'editor',
-                        'CKAN_MEMBER' : 'member'
+        config['ckanext.georchestra.role.sysadmin']: 'sysadmin',
+        config['ckanext.georchestra.role.orgadmin']: 'admin',
+        config['ckanext.georchestra.role.editor']: 'editor'
     }
 
-    ldap_filter = '(|'+''.join([ '(cn='+k+')' for k,v in ldap_roles_dict.iteritems()])+')'
-    ldap_search_result = cnx.search_s(config['ckanext.georchestra.ldap.base_dn.roles'], ldap.SCOPE_ONELEVEL,
-                                      filterstr=ldap_filter,
-                                      attrlist=['cn', 'member', 'description'])
-    roles = dict()
-    for el in ldap_search_result:
-        r = el[1]['cn'][0].decode('utf_8')
-        roles[ldap_roles_dict[r]] = el[1]['member']
-    return roles
+    try:
+        memberships = cnx.search_s(config['ckanext.georchestra.ldap.base_dn.users'],
+                              ldap.SCOPE_ONELEVEL,
+                              '(uid={0})'.format(user_dict['name']),
+                              attrlist=['memberOf'])
+        for ms in memberships:
+            try:
+                memberof_entries = ms[1]['memberOf']
+            except KeyError:
+                continue
+            for m in memberof_entries:
+                # get roles
+                rolere = re.search('cn=(.*),{0}'.format(config['ckanext.georchestra.ldap.base_dn.roles']), m)
+                if rolere:
+                    rolename = rolere.group(1)
+                    try:
+                        # If this command works, it means the role is listed in the dict, hence CKAN role-related
+                        r = ldap_roles_dict[rolename]
+                        user_dict['role'] = r
+                        user_dict['sysadmin'] = (r=='sysadmin')
+                    except KeyError:
+                        # means it is not CKAN roles-related membership. No interest for us. Not an error, though
+                        pass
+                # get the organization he is member of (if there is)
+                orgre = re.search('cn=(.*),{0}'.format(config['ckanext.georchestra.ldap.base_dn.orgs']), m)
+                if orgre:
+                    orgname = orgre.group(1)
+                    user_dict['orgid'] = orgname
 
-def get_ldap_org_members(cnx, org, roles):
-    """
-    Collect LDAP users members of the given organization
-    (org is expected to ba a dict like provided by self.get_ldap_org with org['members'] list)
-    :return:
-    """
-    ldap_users_list = []
-    for member_dn in org['members']:
-        res = cnx.search_s(member_dn, ldap.SCOPE_BASE,
-                                      filterstr='(objectClass=person)',
-                                      attrlist=None)
-        r = get_user_role(res[0][0].decode('utf_8'), roles)
-        user = {'dn': res[0][0].decode('utf_8'),
-                'uid': res[0][1]['uid'][0].decode('utf_8'),
-                'name': res[0][1]['uid'][0].decode('utf_8'),
-                'id': res[0][1]['uid'][0].decode('utf_8'),
-                'cn': res[0][1]['cn'][0].decode('utf_8'),
-                'about': res[0][1]['description'][0].decode('utf_8'),
-                'fullname': res[0][1]['givenName'][0].decode('utf_8'),
-                'display_name': res[0][1]['givenName'][0].decode('utf_8'),
-                'email': res[0][1]['mail'][0].decode('utf_8'),
-                'sn': res[0][1]['sn'][0].decode('utf_8'),
-                'password':'12345678',
-                'role': get_user_role(res[0][0].decode('utf_8'), roles),
-                'sysadmin': (r=='sysadmin'),
-                'state': 'active'
-                }
-        ldap_users_list.append(user)
-    return ldap_users_list
+    except ldap.LDAPError as e:
+        log.error('LDAP search failed: %s' % e)
 
-def get_user_role(user_dn, roles):
-    user_roles = [k for k,v in roles.iteritems() if user_dn in v]
-
-    return user_roles[0] if user_roles else 'member'
+    return user_dict
