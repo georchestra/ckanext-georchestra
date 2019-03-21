@@ -28,20 +28,24 @@ def update_or_create(context, user, force_update=False):
             updated_membership = False
             # Update membership on all organizations he belongs to (we remove him from all except the one listed in
             # his LDAP profile
-            user_orgs_list = toolkit.get_action('organization_list_for_user')(context.copy(), {'id': user['id']})
-            for o in user_orgs_list:
-                log.debug("updating user {0} membership for organization {1}".format(user['id'], o['id']))
-                if ('orgid' in user) and (o['id'] == user['orgid']):
-                    if o['capacity'] != user['role']:
-                        log.debug("changed {0} role for ".format(user['name'], o['id']))
-                        toolkit.get_action('organization_member_create')(context.copy(),
-                                                                         {'id': user['orgid'], 'username': user['name'],
-                                                                          'role': user['role']})
-                    updated_membership = True
-                else:
-                    log.debug("removing user {0} from organization {1}".format(user['name'], o['id']))
-                    toolkit.get_action('organization_member_delete')(context.copy(), {'id': user['orgid'],
+            try:
+                user_orgs_list = toolkit.get_action('organization_list_for_user')(context.copy(), {'id': user['id']})
+                for o in user_orgs_list:
+                    log.debug("updating user {0} membership for organization {1}".format(user['id'], o['id']))
+                    if ('orgid' in user) and (o['id'] == user['orgid']):
+                        if o['capacity'] != user['role']:
+                            log.debug("changed {0} role for ".format(user['name'], o['id']))
+                            toolkit.get_action('organization_member_create')(context.copy(),
+                                                                             {'id': user['orgid'], 'username': user['name'],
+                                                                              'role': user['role']})
+                        updated_membership = True
+                    else:
+                        log.debug("removing user {0} from organization {1}".format(user['name'], o['id']))
+                        toolkit.get_action('organization_member_delete')(context.copy(), {'id': user['orgid'],
                                                                                       'username': user['name']})
+            except toolkit.ObjectNotFound as e:
+                # this should not happen
+                log.error(e, exc_info=True)
             # He not not have belonged to the current org. This is dealt with here
             if ('orgid' in user) and ( not updated_membership):
                 toolkit.get_action('organization_member_create')(context.copy(),

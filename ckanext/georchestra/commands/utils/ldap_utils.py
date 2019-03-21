@@ -221,7 +221,7 @@ def user_format_and_complete(cnx, user):
                  'id': attr['uid'][0],
                  'cn': attr['cn'][0],
                  'about': attr['description'][0],
-                 'fullname': attr['givenName'][0],
+                 'fullname': attr['givenName'][0] + ' '+attr['sn'][0],
                  'display_name': attr['givenName'][0],
                  'email': attr['mail'][0],
                  'sn': attr['sn'][0],
@@ -238,6 +238,7 @@ def user_format_and_complete(cnx, user):
     }
 
     try:
+        #TODO: integrate this search in the main users search above. It probably don't need to run another search
         memberships = cnx.search_s(config['ckanext.georchestra.ldap.base_dn.users'],
                               ldap.SCOPE_ONELEVEL,
                               '(uid={0})'.format(user_dict['name']),
