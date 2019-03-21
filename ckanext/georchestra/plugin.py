@@ -31,10 +31,11 @@ class GeorchestraPlugin(plugins.SingletonPlugin):
     plugins.implements(plugins.IAuthenticator)
     #TODO add IConfigurable implementation as in https://github.com/NaturalHistoryMuseum/ckanext-ldap/blob/master/ckanext/ldap/plugin.py
 
+    prefix = config['ckanext.georchestra.role.prefix']
     ldap_roles_dict = {
-        config['ckanext.georchestra.role.sysadmin']: 'sysadmin',
-        config['ckanext.georchestra.role.orgadmin']: 'admin',
-        config['ckanext.georchestra.role.editor']: 'editor'
+        prefix + config['ckanext.georchestra.role.sysadmin']: 'sysadmin',
+        prefix + config['ckanext.georchestra.role.orgadmin']: 'admin',
+        prefix + config['ckanext.georchestra.role.editor']: 'editor'
     }
 
     # ignore basic auth actions
@@ -70,10 +71,12 @@ class GeorchestraPlugin(plugins.SingletonPlugin):
             roles = headers.get(HEADER_ROLES)
             role = 'member' # default
             if roles:
-                for r in roles.split(","):
+                for r in roles.split(";"):
+                    # roles in headers are comma-separated but somehow end up being semicolon-separated here...
                     if r in self.ldap_roles_dict:
                         role = self.ldap_roles_dict[r]
                         break
+            log.debug('identified user {0} with role {1}'.format(username, role))
             userdict = {
                 'id': username,
                 'email': email,

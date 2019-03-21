@@ -132,7 +132,10 @@ def org_format_and_complete(cnx, org):
         res = cnx.search_s(link, ldap.SCOPE_BASE,
                            filterstr='(objectClass=*)', attrlist=None)
         if res[0][0].startswith('o='):
-            organization['description'] = res[0][1]['description'][0]
+            try :
+                organization['description'] = res[0][1]['description'][0]
+            except KeyError:
+                organization['description'] = ''
         else:
             #TODO retrieve the image data and try to store it as base64 encoded URL
             # org['image_url'] =  'data:image/jpeg;base64, '+res[0][1]['jpegPhoto'][0]
@@ -231,6 +234,7 @@ def user_format_and_complete(cnx, user):
                  'role': 'member'
                 }
 
+    prefix = config['ckanext.georchestra.role.prefix']
     ldap_roles_dict = {
         config['ckanext.georchestra.role.sysadmin']: 'sysadmin',
         config['ckanext.georchestra.role.orgadmin']: 'admin',
@@ -250,6 +254,7 @@ def user_format_and_complete(cnx, user):
                 continue
             for m in memberof_entries:
                 # get roles
+
                 rolere = re.search('cn=(.*),{0}'.format(config['ckanext.georchestra.ldap.base_dn.roles']), m)
                 if rolere:
                     rolename = rolere.group(1)
