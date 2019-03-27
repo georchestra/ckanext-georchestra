@@ -39,7 +39,11 @@ def update_or_create(context, org, force_update=False):
         last_revision = dateutil.parser.parse(revisions[0]['timestamp'] + 'Z')
 
         #last_revision = dateutil.parser.parse('20190208085726Z')
-        if (org['update_ts'] > last_revision) or force_update:
+        # we have 3 update cases :
+        #  - revision date in the LDAP is more recent than in the ckan db
+        #  - the 'title' field is empty, meaning  we created it on-the-fly when a user needed it (see plugin.py)
+        #  - force_update : mostly for testing purpose
+        if (org['update_ts'] > last_revision) or (len(org['title']) == 0) or force_update:
             # then we update it
             log.debug("updating organization {0}".format(org['name']))
             current_org = toolkit.get_action('organization_patch')(context.copy(), org)

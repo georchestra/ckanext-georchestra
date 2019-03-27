@@ -161,7 +161,19 @@ class GeorchestraPlugin(plugins.SingletonPlugin):
                     log.debug("found {0}. Membership OK".format(org_id))
             else:
                 log.debug("TODO : remove user from {0}".format(group.id))
+                toolkit.get_action('organization_member_delete')(context.copy(), {'id': group.id,
+                                                                                  'username': user_id})
+
 
         if his_org is None:
-            log.debug("TODO : add user to {0}".format(org_id))
+            try:
+                toolkit.get_action('organization_member_create')(context.copy(), {'id':org_id, 'username':user_id, 'role':role})
+                log.debug("TODO : add user to {0}".format(org_id))
+
+            except toolkit.ValidationError:
+                # Means it doesn't exist yet => we create it
+                log.debug("Creating organization {0}".format(org_id))
+                #TODO
+                toolkit.get_action('organization_create')(context.copy(), {'name':org_id})
+                toolkit.get_action('organization_member_create')(context.copy(), {'id':org_id, 'username':user_id, 'role':role})
         return "ok"
