@@ -57,9 +57,22 @@ def update_or_create(context, org, force_update=False):
 
 
 def remove(context, orgs_list):
-    for org in orgs_list:
-        delete(context, org)
-        log.debug("purged organization {0}".format(org))
+    for id in orgs_list:
+        org = toolkit.get_action('organization_show')(context.copy(), {'id': id})
+        if org['package_count'] == 0:
+            delete(context, id)
+            log.debug("purged organization {0}".format(id))
+        else:
+            # TODO: discuss the proper way to manage ghost orgs
+            # If we purge an org owning datasets, it will make them hard to manage.
+            log.debug("renamed organization {0}".format(id))
+            if not org['name'].startswith("ghost_"):
+                org['title'] = "[GHOST] " + org['title']
+                #org['name'] = "ghost_" + org['name'] # makes datasets impossible to retrieve...
+                current_org = toolkit.get_action('organization_patch')(context.copy(), org)
+            for u in org['users']:
+                toolkit.get_action('organization_member_delete')(context.copy(), {'id': org['id'], 'username': u['id']})
+
 
 
 def create(context, data_dict):

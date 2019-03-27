@@ -17,25 +17,11 @@ HEADER_LASTNAME = "sec-lastname"
 HEADER_TEL = "sec-tel"
 
 
-def auth_function_disabled(context, data_dict=None):
-    # TODO : consider to return true in some "sysadmin" context. For instance to create organization
-    return {
-        'success': True,
-        'msg': 'Authentication is disabled on CKAN and is handled by geOrchestra.'
-    }
-
-
-@plugins.toolkit.chained_action
-def organization_list_for_user(up_func, context, data_dict):
-    log.debug("wow, I'm there")
-
-
 log = logging.getLogger(__name__)
 
 
 class GeorchestraPlugin(plugins.SingletonPlugin):
     plugins.implements(plugins.IAuthenticator)
-    plugins.implements(plugins.IActions)
     #TODO add IConfigurable implementation as in https://github.com/NaturalHistoryMuseum/ckanext-ldap/blob/master/ckanext/ldap/plugin.py
 
     prefix = config['ckanext.georchestra.role.prefix']
@@ -135,12 +121,19 @@ class GeorchestraPlugin(plugins.SingletonPlugin):
             log.error("User parameters are invalid. Could not create the user. {0}".format(e))
 
 
-    def get_actions(self):
-        """Implementation of IActions.get_actions()"""
-        #return ({u'organization_list_for_user': organization_list_for_user})
-        return ({})
-
     def organization_sync_for_user(self, context, user_id, org_id, role):
+        """
+        Synchronize on-the-fly organization membership. If organization does not exist, it creates an org with only
+        the name (id). The empty title field will serve to know, as next full sync, that this org needs to be updated
+        (otherwise, the update date being more recent, it wouldn't trigger an update)
+        This function needs to go low-level using model, because it is called from identify function, and while in
+        identify, the user is not properly identified and the organization_list_for_user action, for instance, fails.
+        :param context:
+        :param user_id:
+        :param org_id:
+        :param role:
+        :return:
+        """
         model = context['model']
         q = model.Session.query(model.Member, model.Group) \
             .filter(model.Member.table_name == 'user') \
@@ -164,7 +157,6 @@ class GeorchestraPlugin(plugins.SingletonPlugin):
                 toolkit.get_action('organization_member_delete')(context.copy(), {'id': group.id,
                                                                                   'username': user_id})
 
-
         if his_org is None:
             try:
                 toolkit.get_action('organization_member_create')(context.copy(), {'id':org_id, 'username':user_id, 'role':role})
@@ -174,6 +166,5 @@ class GeorchestraPlugin(plugins.SingletonPlugin):
                 # Means it doesn't exist yet => we create it
                 log.debug("Creating organization {0}".format(org_id))
                 #TODO
-                toolkit.get_action('organization_create')(context.copy(), {'name':org_id})
+                his_org = toolkit.get_action('organization_create')(context.copy(), {'name':org_id})
                 toolkit.get_action('organization_member_create')(context.copy(), {'id':org_id, 'username':user_id, 'role':role})
-        return "ok"
