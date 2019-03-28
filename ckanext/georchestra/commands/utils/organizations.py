@@ -31,6 +31,7 @@ def preseed(context):
 
 def update_or_create(context, org, force_update=False):
     try:
+        ckanorg = toolkit.get_action('organization_show')(context.copy(), {'id': org['id'], 'include_extras': True})
         revisions = toolkit.get_action('organization_revision_list')(context.copy(), {'id': org['id']})
         # If no error, also means the org exists
 
@@ -43,7 +44,7 @@ def update_or_create(context, org, force_update=False):
         #  - revision date in the LDAP is more recent than in the ckan db
         #  - the 'title' field is empty, meaning  we created it on-the-fly when a user needed it (see plugin.py)
         #  - force_update : mostly for testing purpose
-        if (org['update_ts'] > last_revision) or (len(org['title']) == 0) or force_update:
+        if (org['update_ts'] > last_revision) or (len(ckanorg['title']) == 0) or force_update:
             # then we update it
             log.debug("updating organization {0}".format(org['name']))
             current_org = toolkit.get_action('organization_patch')(context.copy(), org)
@@ -87,12 +88,21 @@ def create(context, data_dict):
 
 
 def delete(context, id):
-    # TODO : check content and move all packages to a 'ghost' org before purging org
-    context.pop('__auth_audit', None)
     try:
         toolkit.get_action('organization_purge')(context.copy(), {'id': id})
         flush()
         log.debug("purged organization {0}".format(id))
+    except toolkit.ValidationError, e:
+        log.warning('Could not purge organization {0}. Error message states {1}'.format(id, e))
+        #log.error(e, exc_info=True)
+
+def delete_all_orgs(context, delete_active=False):
+    try:
+        #TODO: find a way to list also orgs in state 'deleted'. For now, I don't get them...
+        orgs = toolkit.get_action('organization_list')(context.copy(), {'all_fields':True})
+        for org in orgs:
+            if org['state'] =='deleted' or delete_active:
+                delete(context, org['id'])
     except Exception, e:
         log.error(e, exc_info=True)
 

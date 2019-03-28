@@ -47,6 +47,11 @@ class GeorchestraLDAPCommand(CkanCommand):
 
         if cmd == 'ldap_sync_all':
             self.ldap_sync_all()
+        elif cmd == 'purge_org': # needs you to provide the org id
+            org_utils.delete(self.context, self.args[1])
+        elif cmd == 'purge_all_orgs':
+            purge_all = (len(self.args) > 1) and (self.args[1]=='delete_active')
+            org_utils.delete_all_orgs(self.context, purge_all)
         else:
             print 'Command %s not recognized' % cmd
 
