@@ -61,7 +61,6 @@ class GeorchestraLDAPCommand(CkanCommand):
         ldap_cnx= ldap_utils.get_ldap_connection()
         processed_orgs = self.sync_organizations(ldap_cnx)
         self.sync_users(ldap_cnx)
-        #self.sync_membership(ldap_cnx)
 
 
     def sync_organizations(self, ldap_cnx):

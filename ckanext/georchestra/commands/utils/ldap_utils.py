@@ -167,7 +167,7 @@ def users_scan_and_process(cnx, process, context):
             response = cnx.search_ext(config['ckanext.georchestra.ldap.base_dn.users'],
                                   ldap.SCOPE_ONELEVEL,
                                   u'(objectClass=organizationalPerson)',
-                                  attrlist=None,
+                                  attrlist=[u'dn', u'uid', u'cn', u'description', u'givenName', u'mail', u'sn', u'memberOf'],
                                   serverctrls=[page_control])
         except ldap.LDAPError as e:
             log.error('LDAP search failed: %s' % e)
@@ -223,7 +223,7 @@ def user_format_and_complete(cnx, user):
                  'cn': attr['cn'][0],
                  'about': attr['description'][0],
                  'fullname': attr['givenName'][0] + ' '+attr['sn'][0],
-                 'display_name': attr['givenName'][0],
+                 'display_name': attr['givenName'][0] + ' '+attr['sn'][0],
                  'email': attr['mail'][0],
                  'sn': attr['sn'][0],
                  'password': '12345678',
@@ -240,35 +240,25 @@ def user_format_and_complete(cnx, user):
     }
 
     try:
-        #TODO: integrate this search in the main users search above. It probably don't need to run another search
-        memberships = cnx.search_s(config['ckanext.georchestra.ldap.base_dn.users'],
-                              ldap.SCOPE_ONELEVEL,
-                              u'(uid={0})'.format(user_dict['name']),
-                              attrlist=[u'memberOf'])
-        for ms in memberships:
-            try:
-                memberof_entries = ms[1]['memberOf']
-            except KeyError:
-                continue
-            for m in memberof_entries:
-                # get roles
+        for m in attr['memberOf']:
+            # get roles
 
-                rolere = re.search(u'cn=(.*),{0}'.format(config['ckanext.georchestra.ldap.base_dn.roles']), m)
-                if rolere:
-                    rolename = rolere.group(1)
-                    try:
-                        # If this command works, it means the role is listed in the dict, hence CKAN role-related
-                        r = ldap_roles_dict[rolename]
-                        user_dict['role'] = r
-                        user_dict['sysadmin'] = (r=='sysadmin')
-                    except KeyError:
-                        # means it is not CKAN roles-related membership. No interest for us. Not an error, though
-                        pass
-                # get the organization he is member of (if there is)
-                orgre = re.search(u'cn=(.*),{0}'.format(config['ckanext.georchestra.ldap.base_dn.orgs']), m)
-                if orgre:
-                    orgname = orgre.group(1)
-                    user_dict['orgid'] = orgname
+            rolere = re.search(u'cn=(.*),{0}'.format(config['ckanext.georchestra.ldap.base_dn.roles']), m)
+            if rolere:
+                rolename = rolere.group(1)
+                try:
+                    # If this command works, it means the role is listed in the dict, hence CKAN role-related
+                    r = ldap_roles_dict[rolename]
+                    user_dict['role'] = r
+                    user_dict['sysadmin'] = (r=='sysadmin')
+                except KeyError:
+                    # means it is not CKAN roles-related membership. No interest for us. Not an error, though
+                    pass
+            # get the organization he is member of (if there is)
+            orgre = re.search(u'cn=(.*),{0}'.format(config['ckanext.georchestra.ldap.base_dn.orgs']), m)
+            if orgre:
+                orgname = orgre.group(1)
+                user_dict['orgid'] = orgname
 
     except ldap.LDAPError as e:
         log.error('LDAP search failed: %s' % e)
