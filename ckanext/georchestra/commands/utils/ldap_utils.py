@@ -13,10 +13,8 @@ def get_ldap_connection():
     """
     :return: LDAP connection object
     """
-    # TODO manage bytes_mode=False : see how to properly deal with unicode config. I can unicode(config[...]) every
-    #      config file, but this looks dirty
-    # TODO trace_level seems not possible to configure from ini files. Strange
-    cnx = ldap.initialize(config['ckanext.georchestra.ldap.uri'], bytes_mode=False, trace_level=0)
+    cnx = ldap.initialize(config['ckanext.georchestra.ldap.uri'], bytes_mode=False,
+                          trace_level=config['ckanext.georchestra.ldap.trace_level'])
 
     if config.get('ckanext.georchestra.ldap.auth.dn'):
         try:
