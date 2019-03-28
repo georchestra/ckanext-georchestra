@@ -21,6 +21,13 @@ log = logging.getLogger(__name__)
 
 
 class GeorchestraPlugin(plugins.SingletonPlugin):
+    """
+    Georchestra plugin
+
+    This plugin plugin synchronizes the users, organizations and user membership with a georchestra LDAP instance.
+    On user access, it performs a quick check and sync on this user only.
+    For full sync, use the paster command (should be set as cron task)
+    """
     plugins.implements(plugins.IAuthenticator)
     #TODO add IConfigurable implementation as in https://github.com/NaturalHistoryMuseum/ckanext-ldap/blob/master/ckanext/ldap/plugin.py
 
@@ -30,7 +37,6 @@ class GeorchestraPlugin(plugins.SingletonPlugin):
         prefix + config['ckanext.georchestra.role.orgadmin']: 'admin',
         prefix + config['ckanext.georchestra.role.editor']: 'editor'
     }
-
     sync_done = False
 
     # ignore basic auth actions
@@ -64,6 +70,7 @@ class GeorchestraPlugin(plugins.SingletonPlugin):
             firstname = headers.get(HEADER_FIRSTNAME) or 'john'
             lastname = headers.get(HEADER_LASTNAME) or 'doe'
             roles = headers.get(HEADER_ROLES)
+            org = headers.get(HEADER_ORG)
             role = 'member' # default
             if roles:
                 for r in roles.split(";"):
@@ -78,6 +85,7 @@ class GeorchestraPlugin(plugins.SingletonPlugin):
                 'name': username,
                 'fullname': firstname + ' ' + lastname,
                 'password': '12345678',
+                'org': org,
                 'role': role,
                 'sysadmin': (role=='sysadmin'),
                 'state': 'active'
@@ -85,7 +93,7 @@ class GeorchestraPlugin(plugins.SingletonPlugin):
             try:
                 ckan_user = toolkit.get_action('user_show')(self.context, {'id': userdict['name']})
 
-                # TODO don't check at evry call find a way to store the info it was already synced
+                # TODO don't check at every call find a way to store the info it was already synced
                 # Check if the user needs to be updated
                 check_fields = ['name', 'email', 'fullname', 'sysadmin', 'state']
                 checks = [(ckan_user[f] != userdict[f]) for f in check_fields]
@@ -96,12 +104,10 @@ class GeorchestraPlugin(plugins.SingletonPlugin):
                 else:
                     log.debug("user {0} is up-to-date".format(userdict['name']))
 
-                toolkit.c.user = ckan_user['name']
-                toolkit.c.user_obj = ckan_user
-
-                #TODO check if user membership needs updating and if needs organization to be created
+                # check if user membership needs updating and if needs organization to be created
+                # TODO: if sysadmin, we still need to check if the org needs to be created
                 if role != 'sysadmin':
-                    self.organization_sync_for_user(self.context, ckan_user['id'], headers.get(HEADER_ORG), role)
+                    self.organization_sync_for_user(userdict['id'], userdict['org'], userdict['role'])
             except toolkit.ObjectNotFound:
                 # Means it doesn't exist yet => we create it
                 self.create_user(userdict)
@@ -115,13 +121,14 @@ class GeorchestraPlugin(plugins.SingletonPlugin):
         try:
             ckan_user = toolkit.get_action('user_create')(self.context.copy(), userdict)
             log.debug("created user {0}".format(userdict['id']))
+            self.organization_set_member_or_create(userdict['id'], userdict['org'], userdict['role'])
             # TODO check organization existence
             # TODO add membership to org
         except toolkit.ValidationError as e:
             log.error("User parameters are invalid. Could not create the user. {0}".format(e))
 
 
-    def organization_sync_for_user(self, context, user_id, org_id, role):
+    def organization_sync_for_user(self, user_id, org_id, role):
         """
         Synchronize on-the-fly organization membership. If organization does not exist, it creates an org with only
         the name (id). The empty title field will serve to know, as next full sync, that this org needs to be updated
@@ -134,7 +141,7 @@ class GeorchestraPlugin(plugins.SingletonPlugin):
         :param role:
         :return:
         """
-        model = context['model']
+        model = self.context['model']
         q = model.Session.query(model.Member, model.Group) \
             .filter(model.Member.table_name == 'user') \
             .filter(model.Member.table_id == user_id) \
@@ -144,27 +151,43 @@ class GeorchestraPlugin(plugins.SingletonPlugin):
         for member, group in q.all():
             log.debug('user {0} is member of {1} with role {2}'.format(user_id, group.id, member.capacity))
             if group.id == org_id:
-                his_org = model_dictize.group_dictize(group, context)
+                his_org = model_dictize.group_dictize(group, self.context)
                 if member.capacity != role:
                     log.debug("found {0}. Update membership".format(org_id))
-                    toolkit.get_action('organization_member_create')(context.copy(),
+                    toolkit.get_action('organization_member_create')(self.context.copy(),
                                                                      {'id': org_id, 'username': user_id,
                                                                       'role': role})
                 else:
                     log.debug("found {0}. Membership OK".format(org_id))
             else:
                 log.debug("TODO : remove user from {0}".format(group.id))
-                toolkit.get_action('organization_member_delete')(context.copy(), {'id': group.id,
+                toolkit.get_action('organization_member_delete')(self.context.copy(), {'id': group.id,
                                                                                   'username': user_id})
 
         if his_org is None:
-            try:
-                toolkit.get_action('organization_member_create')(context.copy(), {'id':org_id, 'username':user_id, 'role':role})
-                log.debug("TODO : add user to {0}".format(org_id))
+            self.organization_set_member_or_create(user_id, org_id, role)
 
-            except toolkit.ValidationError:
-                # Means it doesn't exist yet => we create it
-                log.debug("Creating organization {0}".format(org_id))
-                #TODO
-                his_org = toolkit.get_action('organization_create')(context.copy(), {'name':org_id})
-                toolkit.get_action('organization_member_create')(context.copy(), {'id':org_id, 'username':user_id, 'role':role})
+
+    def organization_set_member_or_create(self, user_id, org_id, role):
+        """
+        Set user as member of the organization, with the given role.
+        If the organization doesn't exist, create the organization, setting only it's ID. The remaining information will
+        be completed on next full sync (paster command)
+        :param self:
+        :param user_id:
+        :param org_id:
+        :param role:
+        :return:
+        """
+        try:
+            toolkit.get_action('organization_member_create')(self.context.copy(), {'id': org_id, 'username': user_id,
+                                                                                   'role': role})
+            log.debug("added user to {0}".format(org_id))
+
+        except toolkit.ValidationError:
+            # Means it doesn't exist yet => we create it
+            log.debug("Creating organization {0}".format(org_id))
+            his_org = toolkit.get_action('organization_create')(self.context.copy(), {'name': org_id})
+            log.debug("adding user to {0}".format(org_id))
+            toolkit.get_action('organization_member_create')(self.context.copy(), {'id': org_id, 'username': user_id,
+                                                                                   'role': role})

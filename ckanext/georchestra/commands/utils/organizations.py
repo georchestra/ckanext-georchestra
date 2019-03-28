@@ -66,7 +66,7 @@ def remove(context, orgs_list):
             # TODO: discuss the proper way to manage ghost orgs
             # If we purge an org owning datasets, it will make them hard to manage.
             log.debug("renamed organization {0}".format(id))
-            if not org['name'].startswith("ghost_"):
+            if not org['title'].startswith("[GHOST] "):
                 org['title'] = "[GHOST] " + org['title']
                 #org['name'] = "ghost_" + org['name'] # makes datasets impossible to retrieve...
                 current_org = toolkit.get_action('organization_patch')(context.copy(), org)
