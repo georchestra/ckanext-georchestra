@@ -16,7 +16,7 @@ def get_ldap_connection():
     # TODO manage bytes_mode=False : see how to properly deal with unicode config. I can unicode(config[...]) every
     #      config file, but this looks dirty
     # TODO trace_level seems not possible to configure from ini files. Strange
-    cnx = ldap.initialize(config['ckanext.georchestra.ldap.uri'], bytes_mode=True, trace_level=0)
+    cnx = ldap.initialize(config['ckanext.georchestra.ldap.uri'], bytes_mode=False, trace_level=0)
 
     if config.get('ckanext.georchestra.ldap.auth.dn'):
         try:
@@ -72,8 +72,8 @@ def orgs_scan_and_process(cnx, process, context):
         try:
             response = cnx.search_ext(config['ckanext.georchestra.ldap.base_dn.orgs'],
                                   ldap.SCOPE_ONELEVEL,
-                                  '(objectClass=groupOfMembers)',
-                                  attrlist=['dn', 'cn', 'o', 'member', 'seeAlso', 'modifytimestamp'],
+                                  u'(objectClass=groupOfMembers)',
+                                  attrlist=[u'dn', u'cn', u'o', u'member', u'seeAlso', u'modifytimestamp'],
                                   serverctrls=[page_control])
         except ldap.LDAPError as e:
             log.error('LDAP search failed: %s' % e)
@@ -129,8 +129,8 @@ def org_format_and_complete(cnx, org):
 
     see_also_links = attr['seeAlso']
     for link in see_also_links:
-        res = cnx.search_s(link, ldap.SCOPE_BASE,
-                           filterstr='(objectClass=*)', attrlist=None)
+        res = cnx.search_s(unicode(link, encoding='utf-8'), ldap.SCOPE_BASE,
+                           filterstr=u'(objectClass=*)', attrlist=None)
         if res[0][0].startswith('o='):
             try :
                 organization['description'] = res[0][1]['description'][0]
@@ -168,7 +168,7 @@ def users_scan_and_process(cnx, process, context):
         try:
             response = cnx.search_ext(config['ckanext.georchestra.ldap.base_dn.users'],
                                   ldap.SCOPE_ONELEVEL,
-                                  '(objectClass=organizationalPerson)',
+                                  u'(objectClass=organizationalPerson)',
                                   attrlist=None,
                                   serverctrls=[page_control])
         except ldap.LDAPError as e:
@@ -245,8 +245,8 @@ def user_format_and_complete(cnx, user):
         #TODO: integrate this search in the main users search above. It probably don't need to run another search
         memberships = cnx.search_s(config['ckanext.georchestra.ldap.base_dn.users'],
                               ldap.SCOPE_ONELEVEL,
-                              '(uid={0})'.format(user_dict['name']),
-                              attrlist=['memberOf'])
+                              u'(uid={0})'.format(user_dict['name']),
+                              attrlist=[u'memberOf'])
         for ms in memberships:
             try:
                 memberof_entries = ms[1]['memberOf']
@@ -255,7 +255,7 @@ def user_format_and_complete(cnx, user):
             for m in memberof_entries:
                 # get roles
 
-                rolere = re.search('cn=(.*),{0}'.format(config['ckanext.georchestra.ldap.base_dn.roles']), m)
+                rolere = re.search(u'cn=(.*),{0}'.format(config['ckanext.georchestra.ldap.base_dn.roles']), m)
                 if rolere:
                     rolename = rolere.group(1)
                     try:
@@ -267,7 +267,7 @@ def user_format_and_complete(cnx, user):
                         # means it is not CKAN roles-related membership. No interest for us. Not an error, though
                         pass
                 # get the organization he is member of (if there is)
-                orgre = re.search('cn=(.*),{0}'.format(config['ckanext.georchestra.ldap.base_dn.orgs']), m)
+                orgre = re.search(u'cn=(.*),{0}'.format(config['ckanext.georchestra.ldap.base_dn.orgs']), m)
                 if orgre:
                     orgname = orgre.group(1)
                     user_dict['orgid'] = orgname

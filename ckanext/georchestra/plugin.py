@@ -16,7 +16,6 @@ HEADER_FIRSTNAME = "sec-firstname"
 HEADER_LASTNAME = "sec-lastname"
 HEADER_TEL = "sec-tel"
 
-
 log = logging.getLogger(__name__)
 
 
@@ -29,6 +28,7 @@ class GeorchestraPlugin(plugins.SingletonPlugin):
     For full sync, use the paster command (should be set as cron task)
     """
     plugins.implements(plugins.IAuthenticator)
+    plugins.implements(plugins.IConfigurable)
     #TODO add IConfigurable implementation as in https://github.com/NaturalHistoryMuseum/ckanext-ldap/blob/master/ckanext/ldap/plugin.py
 
     prefix = config['ckanext.georchestra.role.prefix']
@@ -117,16 +117,69 @@ class GeorchestraPlugin(plugins.SingletonPlugin):
         else:
             toolkit.c.user = None
 
+    def configure(self, main_config):
+        """Implementation of IConfigurable.configure"""
+        # Our own config schema, defines required items, default values and transform functions
+        # strongly inspired from from https://github.com/NaturalHistoryMuseum/ckanext-ldap/blob/master/ckanext/ldap/plugin.py
+        schema = {
+            'ckanext.georchestra.ldap.uri': {'required': True},
+            'ckanext.georchestra.ldap.base_dn': {'required': True},
+            'ckanext.georchestra.ldap.base_dn.orgs': {'required': True},
+            'ckanext.georchestra.ldap.base_dn.roles': {'required': True},
+            'ckanext.georchestra.ldap.base_dn.users': {'required': True},
+            'ckanext.georchestra.ldap.auth.dn': {'required': True},
+            'ckanext.georchestra.ldap.users.nosync': {'default': 'geoserver_privileged_user'},
+            'ckanext.georchestra.ldap.auth.password': {'required': True},
+            'ckanext.georchestra.ldap.auth.method': {'default': 'SIMPLE', 'validate': _allowed_auth_methods},
+            'ckanext.georchestra.ldap.auth.mechanism': {'default': 'DIGEST-MD5', 'validate': _allowed_auth_mechanisms},
+            'ckanext.georchestra.ldap.trace_level': {'default': 0, 'parse': toolkit.asint},
+            'ckanext.georchestra.role.prefix': {'default': 'ROLE_'},
+            'ckanext.georchestra.role.sysadmin': {'default': 'CKAN_SYSADMIN'},
+            'ckanext.georchestra.role.orgadmin': {'default': 'CKAN_ADMIN'},
+            'ckanext.georchestra.role.editor': {'default': 'CKAN_EDITOR'},
+            'ckanext.georchestra.external_users': {'default': 'ckan'},
+            'ckanext.georchestra.orphans.users.purge': {'default': True, 'parse': toolkit.asbool},
+            'ckanext.georchestra.orphans.users.orgname': {'default': 'orphan_users'},
+        }
+        errors = []
+        for i in schema:
+            v = None
+            if i in main_config:
+                v = main_config[i]
+            elif i.replace('ckanext.', '') in main_config:
+                log.warning('Georchestra configuration options should be prefixed with \'ckanext.\'. ' +
+                            'Please update {0} to {1}'.format(i.replace('ckanext.', ''), i))
+
+            if v:
+                if 'parse' in schema[i]:
+                    v = (schema[i]['parse'])(v)
+                try:
+                    if 'validate' in schema[i]:
+                        (schema[i]['validate'])(v)
+                    main_config[i] = v
+                except ConfigError as e:
+                    errors.append(str(e))
+            elif schema[i].get('required', False):
+                errors.append('Configuration parameter {} is required'.format(i))
+            elif schema[i].get('required_if', False) and schema[i]['required_if'] in main_config:
+                errors.append('Configuration parameter {} is required when {} is present'.format(i,
+                                                                                            schema[i]['required_if']))
+            elif 'default' in schema[i]:
+                main_config[i] = schema[i]['default']
+        if len(errors):
+            raise ConfigError("\n".join(errors))
+        # make sure all the strings in the config are unicode formatted
+        for key, value in main_config.iteritems():
+            if isinstance(value, str):
+                main_config[key] = unicode(value, encoding='utf-8')
+
     def create_user(self, userdict):
         try:
             ckan_user = toolkit.get_action('user_create')(self.context.copy(), userdict)
             log.debug("created user {0}".format(userdict['id']))
             self.organization_set_member_or_create(userdict['id'], userdict['org'], userdict['role'])
-            # TODO check organization existence
-            # TODO add membership to org
         except toolkit.ValidationError as e:
             log.error("User parameters are invalid. Could not create the user. {0}".format(e))
-
 
     def organization_sync_for_user(self, user_id, org_id, role):
         """
@@ -187,7 +240,27 @@ class GeorchestraPlugin(plugins.SingletonPlugin):
         except toolkit.ValidationError:
             # Means it doesn't exist yet => we create it
             log.debug("Creating organization {0}".format(org_id))
+            #his_org = toolkit.get_action('organization_create')(self.context.copy(), {'name': org_id,
+            #                                                                          'extras': [{
+            #                                                                                'key': 'needs_sync',
+            #                                                                                'value':True
+            #                                                                            }]
+            #                                                                          })
             his_org = toolkit.get_action('organization_create')(self.context.copy(), {'name': org_id})
             log.debug("adding user to {0}".format(org_id))
             toolkit.get_action('organization_member_create')(self.context.copy(), {'id': org_id, 'username': user_id,
                                                                                    'role': role})
+
+
+class ConfigError(Exception):
+    pass
+
+def _allowed_auth_methods(v):
+    """Raise an exception if the value is not an allowed authentication method"""
+    if v.upper() not in ['SIMPLE', 'SASL']:
+        raise ConfigError('Only SIMPLE and SASL authentication methods are supported')
+
+def _allowed_auth_mechanisms(v):
+    """Raise an exception if the value is not an allowed authentication mechanism"""
+    if v.upper() not in ['DIGEST-MD5',]:  # Only DIGEST-MD5 is supported when the auth method is SASL
+        raise ConfigError('Only DIGEST-MD5 is supported as an authentication mechanism')
