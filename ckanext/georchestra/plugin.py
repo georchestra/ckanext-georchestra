@@ -18,6 +18,15 @@ HEADER_TEL = "sec-tel"
 
 log = logging.getLogger(__name__)
 
+def organization_edit(context, data_dict=None):
+    return {'success': False,
+            'msg': 'Managed by Georchestra LDAP console'}
+
+def user_edit(context, data_dict=None):
+    return {'success': False,
+            'msg': 'Managed by Georchestra LDAP console'}
+
+
 
 class GeorchestraPlugin(plugins.SingletonPlugin):
     """
@@ -29,7 +38,9 @@ class GeorchestraPlugin(plugins.SingletonPlugin):
     """
     plugins.implements(plugins.IAuthenticator)
     plugins.implements(plugins.IConfigurable)
-    #TODO add IConfigurable implementation as in https://github.com/NaturalHistoryMuseum/ckanext-ldap/blob/master/ckanext/ldap/plugin.py
+    plugins.implements(plugins.IConfigurer)
+    plugins.implements(plugins.IAuthFunctions)
+    #TODO improve IConfigurer implementation ?
 
     prefix = config['ckanext.georchestra.role.prefix']
     ldap_roles_dict = {
@@ -38,6 +49,21 @@ class GeorchestraPlugin(plugins.SingletonPlugin):
         prefix + config['ckanext.georchestra.role.editor']: 'editor'
     }
     sync_done = False
+
+    def get_auth_functions(self):
+        """Implementation of IAuthFunctions.get_auth_functions"""
+        return {
+            'organization_update': organization_edit,
+            'user_update':user_edit
+        }
+
+    def update_config(self, config):
+
+        # Add this plugin's templates dir to CKAN's extra_template_paths, so
+        # that CKAN will use this plugin's custom templates.
+        # 'templates' is the path to the templates dir, relative to this
+        # plugin.py file.
+        toolkit.add_template_directory(config, 'templates')
 
     # ignore basic auth actions
     def login(self):
