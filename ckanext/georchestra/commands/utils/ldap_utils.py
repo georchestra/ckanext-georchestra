@@ -120,8 +120,8 @@ def org_format_and_complete(cnx, org):
     # Split the org tuple
     dn, attr = org
     organization = {'dn':dn,
-                    'name': attr['cn'][0],
-                    'id'  : attr['cn'][0],
+                    'name': sanitize(attr['cn'][0]),
+                    'id'  : sanitize(attr['cn'][0]),
                     'title': attr['o'][0],
                     'update_ts':dateutil.parser.parse(attr['modifyTimestamp'][0])}
 
@@ -140,7 +140,6 @@ def org_format_and_complete(cnx, org):
             pass
 
     return organization
-
 
 def users_scan_and_process(cnx, process, context):
     """
@@ -217,15 +216,15 @@ def user_format_and_complete(cnx, user):
     """
     dn, attr = user
     user_dict = {'dn': dn,
-                 'uid': attr['uid'][0],
-                 'name': attr['uid'][0],
-                 'id': attr['uid'][0],
-                 'cn': attr['cn'][0],
-                 'about': attr['description'][0],
-                 'fullname': attr['givenName'][0] + ' '+attr['sn'][0],
-                 'display_name': attr['givenName'][0] + ' '+attr['sn'][0],
-                 'email': attr['mail'][0],
-                 'sn': attr['sn'][0],
+                 'uid': getFirstValue(attr.get('uid')),
+                 'name': sanitize(getFirstValue(attr.get('uid'))),
+                 'id': sanitize(getFirstValue(attr.get('uid'))),
+                 'cn': getFirstValue(attr.get('cn')),
+                 'about': getFirstValue(attr.get('description')),
+                 'fullname': getFirstValue(attr.get('givenName')) + ' '+getFirstValue(attr.get('sn')),
+                 'display_name': getFirstValue(attr.get('givenName')) + ' '+getFirstValue(attr.get('sn')),
+                 'email': getFirstValue(attr.get('mail')),
+                 'sn': getFirstValue(attr.get('sn')),
                  'password': '12345678',
                  'state': 'active',
                  'sysadmin': False,
@@ -258,9 +257,28 @@ def user_format_and_complete(cnx, user):
             orgre = re.search(u'cn=(.*),{0}'.format(config['ckanext.georchestra.ldap.base_dn.orgs']), m)
             if orgre:
                 orgname = orgre.group(1)
-                user_dict['orgid'] = orgname
+                user_dict['orgid'] = sanitize(orgname)
 
     except ldap.LDAPError as e:
         log.error('LDAP search failed: %s' % e)
 
     return user_dict
+
+def sanitize(s):
+    """
+    Make string compatible for usage as CKAN org name: make it lowercase and remove anything other than alphanumeric
+    or -_
+    :param s:
+    :return:
+    """
+    return re.sub(r'[^\w-]', '_',s).lower()
+
+def getFirstValue(attr_list):
+    """
+    Get the  string value of the first element of the list or '' if not defined
+    :param el:
+    :return:
+    """
+    if not attr_list:
+        return u''
+    return unicode(attr_list[0], encoding='utf-8')

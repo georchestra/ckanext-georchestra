@@ -61,8 +61,8 @@ def create(context, user):
     ckan_user = None
     try:
         # create user
+        log.debug("create user {0}".format(user['id']))
         ckan_user = toolkit.get_action('user_create')(context.copy(), user)
-        log.debug("created user {0}".format(user['id']))
 
         if (user['role'] != 'sysadmin') and ('orgid' in user):
             # add it as member of the organization

@@ -26,10 +26,6 @@ class GeorchestraLDAPCommand(CkanCommand):
     cnx = None
     ldap_orgs_list = None
 
-    #TODO: change those values to False for prod
-    is_dev_mode=True
-    is_debug_mode=True
-
     def command(self):
 
         if not self.args or self.args[0] in ['--help', '-h', 'help']:
@@ -56,10 +52,11 @@ class GeorchestraLDAPCommand(CkanCommand):
             print 'Command %s not recognized' % cmd
 
     def ldap_sync_all(self):
+        # TODO: define the log level in config parameter
         log.setLevel(logging.DEBUG)
 
         ldap_cnx= ldap_utils.get_ldap_connection()
-        processed_orgs = self.sync_organizations(ldap_cnx)
+        self.sync_organizations(ldap_cnx)
         self.sync_users(ldap_cnx)
 
 
@@ -70,7 +67,7 @@ class GeorchestraLDAPCommand(CkanCommand):
 
         orgs_to_delete = set(ckan_orgs_names_list) - set (processed_orgs)
         org_utils.remove(self.clean_context(), orgs_to_delete)
-        log.debug("orgs sync ok !")
+        log.info("Synchronized {0} orgs".format(len(processed_orgs)))
         return processed_orgs
 
     def sync_users(self, ldap_cnx):
@@ -83,11 +80,12 @@ class GeorchestraLDAPCommand(CkanCommand):
         users_to_delete = set(ckan_users_list) - set(processed_users + notouch_userids)
         for orphan in users_to_delete:
             user_utils.delete(self.clean_context(), orphan, config['ckanext.georchestra.orphans.users.purge'])
-        log.debug("users sync ok !")
+        log.info("Synchronized {0} users".format(len(processed_users)))
         return processed_users
 
     def get_ckan_orgs(self):
-        orgs = toolkit.get_action('organization_list')(self.clean_context(), {'limit': 1000, 'all_fields':False})
+        # TODO: add a config parameter ckan.group_and_organization_list_max (defaults to 1000, might need to be higher for big instances). and document this
+        orgs = toolkit.get_action('organization_list')(self.clean_context(), {'all_fields':False})
         return orgs
 
     def get_ckan_users(self):
