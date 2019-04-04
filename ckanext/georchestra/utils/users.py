@@ -1,7 +1,6 @@
 # encoding: utf-8
 
 import logging
-import dateutil
 
 from ckan.plugins import toolkit
 import ckan.model as model
@@ -102,7 +101,7 @@ def delete(context, id, purge=True, orphan_org_name='orphan_users'):
 
         try:
             # Add user to this org
-            toolkit.get_action('organization_member_create')(context.copy(), {'id': orphan_org_name, 'username':id})
+            toolkit.get_action('organization_member_create')(context.copy(), {'id': orphan_org_name, 'username':id, 'role':'member'})
 
             # Remove user from other orgs
             user_orgs = toolkit.get_action('organization_list_for_user')(context.copy(), {'id': id})

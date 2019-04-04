@@ -10,6 +10,7 @@ import ckan.model as model
 import ckan.plugins.toolkit as toolkit
 from ckan.plugins.toolkit import config
 import ckan.lib.dictization.model_dictize as model_dictize
+import ckanext.georchestra.utils.organizations as organizations_utils
 
 HEADER_USERNAME = "sec-username"
 HEADER_ROLES = "sec-roles"
@@ -93,58 +94,65 @@ class GeorchestraPlugin(plugins.SingletonPlugin):
 
         headers = toolkit.request.headers
         username = headers.get(HEADER_USERNAME)
-        if username:
-            email = headers.get(HEADER_EMAIL) or 'empty@empty.org'
-            emailhash = md5(email.strip().lower().encode('utf8')).hexdigest()
-            firstname = headers.get(HEADER_FIRSTNAME) or 'john'
-            lastname = headers.get(HEADER_LASTNAME) or 'doe'
-            roles = headers.get(HEADER_ROLES)
-            org = headers.get(HEADER_ORG)
-            role = 'member' # default
-            if roles:
-                for r in roles.split(";"):
-                    # roles in headers are comma-separated but somehow end up being semicolon-separated here...
-                    if r in self.ldap_roles_dict:
-                        role = self.ldap_roles_dict[r]
-                        break
-            log.debug('identified user {0} with role {1}'.format(username, role))
-            userdict = {
-                'id': username,
-                'email': email,
-                'name': username,
-                'fullname': firstname + ' ' + lastname,
-                'password': '12345678',
-                'org': org,
-                'role': role,
-                'sysadmin': (role=='sysadmin'),
-                'state': 'active'
-            }
-            try:
-                ckan_user = toolkit.get_action('user_show')(self.context, {'id': userdict['name']})
-
-                # TODO don't check at every call find a way to store the info it was already synced
-                # Check if the user needs to be updated
-                check_fields = ['name', 'email', 'fullname', 'sysadmin', 'state']
-                checks = [(ckan_user[f] != userdict[f]) for f in check_fields]
-                needs_update = reduce(lambda x, y: x or y, checks)
-                if needs_update:
-                    ckan_user = toolkit.get_action('user_update')(self.context, userdict)
-                    log.debug("updated user {0}".format(userdict['name']))
-                else:
-                    log.debug("user {0} is up-to-date".format(userdict['name']))
-
-                # check if user membership needs updating and if needs organization to be created
-                # TODO: if sysadmin, we still need to check if the org needs to be created
-                if role != 'sysadmin':
-                    self.organization_sync_for_user(userdict['id'], userdict['org'], userdict['role'])
-            except toolkit.ObjectNotFound:
-                # Means it doesn't exist yet => we create it
-                self.create_user(userdict)
-
-            toolkit.c.user = username
-            #toolkit.c.user_obj = ckan_user
-        else:
+        if not username:
             toolkit.c.user = None
+            return
+
+        email = headers.get(HEADER_EMAIL) or 'empty@empty.org'
+        #emailhash = md5(email.strip().lower().encode('utf8')).hexdigest()
+        firstname = headers.get(HEADER_FIRSTNAME) or 'john'
+        lastname = headers.get(HEADER_LASTNAME) or 'doe'
+        roles = headers.get(HEADER_ROLES)
+        org = headers.get(HEADER_ORG)
+        role = 'member' # default
+        if roles:
+            for r in roles.split(";"):
+                # roles in headers are comma-separated but somehow end up being semicolon-separated here...
+                if r in self.ldap_roles_dict:
+                    role = self.ldap_roles_dict[r]
+                    break
+        log.debug('identified user {0} with role {1}'.format(username, role))
+        userdict = {
+            'id': username,
+            'email': email,
+            'name': username,
+            'fullname': firstname + ' ' + lastname,
+            'password': '12345678',
+            'org': org,
+            'role': role,
+            'sysadmin': (role=='sysadmin'),
+            'state': 'active'
+        }
+        try:
+            ckan_user = toolkit.get_action('user_show')(self.context, {'id': userdict['name']})
+
+            # TODO don't check at every call find a way to store the info it was already synced
+            # Check if the user needs to be updated
+            check_fields = ['name', 'email', 'fullname', 'sysadmin', 'state']
+            checks = [(ckan_user[f] != userdict[f]) for f in check_fields]
+            needs_update = reduce(lambda x, y: x or y, checks)
+            if needs_update:
+                ckan_user = toolkit.get_action('user_update')(self.context, userdict)
+                log.debug("updated user {0}".format(userdict['name']))
+            else:
+                log.debug("user {0} is up-to-date".format(userdict['name']))
+
+            if role == 'sysadmin':
+                # if sysadmin, we only need to check if the org needs to be created
+                try:
+                    toolkit.get_action('organization_create')(self.context.copy(), {'name': userdict['org']})
+                except Exception, e:
+                    # organization most likely exists, which will fail the create action. We ignore this.
+                    pass
+            else:
+                # check if user membership needs updating and if needs organization to be created
+                self.organization_sync_for_user(userdict['id'], userdict['org'], userdict['role'])
+        except toolkit.ObjectNotFound:
+            # Means it doesn't exist yet => we create it
+            self.create_user(userdict)
+
+        toolkit.c.user = username
+        #toolkit.c.user_obj = ckan_user # seems not necessary. Raises an error when the user is new
 
     def configure(self, main_config):
         """Implementation of IConfigurable.configure"""
@@ -237,9 +245,7 @@ class GeorchestraPlugin(plugins.SingletonPlugin):
                 his_org = model_dictize.group_dictize(group, self.context)
                 if member.capacity != role:
                     log.debug("found {0}. Update membership".format(org_id))
-                    toolkit.get_action('organization_member_create')(self.context.copy(),
-                                                                     {'id': org_id, 'username': user_id,
-                                                                      'role': role})
+                    organizations_utils.organization_set_member_or_create(user_id, org_id, role)
                 else:
                     log.debug("found {0}. Membership OK".format(org_id))
             else:
@@ -248,38 +254,7 @@ class GeorchestraPlugin(plugins.SingletonPlugin):
                                                                                   'username': user_id})
 
         if his_org is None:
-            self.organization_set_member_or_create(user_id, org_id, role)
-
-
-    def organization_set_member_or_create(self, user_id, org_id, role):
-        """
-        Set user as member of the organization, with the given role.
-        If the organization doesn't exist, create the organization, setting only it's ID. The remaining information will
-        be completed on next full sync (paster command)
-        :param self:
-        :param user_id:
-        :param org_id:
-        :param role:
-        :return:
-        """
-        try:
-            toolkit.get_action('organization_member_create')(self.context.copy(), {'id': org_id, 'username': user_id,
-                                                                                   'role': role})
-            log.debug("added user to {0}".format(org_id))
-
-        except toolkit.ValidationError:
-            # Means it doesn't exist yet => we create it
-            log.debug("Creating organization {0}".format(org_id))
-            #his_org = toolkit.get_action('organization_create')(self.context.copy(), {'name': org_id,
-            #                                                                          'extras': [{
-            #                                                                                'key': 'needs_sync',
-            #                                                                                'value':True
-            #                                                                            }]
-            #                                                                          })
-            his_org = toolkit.get_action('organization_create')(self.context.copy(), {'name': org_id})
-            log.debug("adding user to {0}".format(org_id))
-            toolkit.get_action('organization_member_create')(self.context.copy(), {'id': org_id, 'username': user_id,
-                                                                                   'role': role})
+            organizations_utils.organization_set_member_or_create(user_id, org_id, role)
 
 
 class ConfigError(Exception):

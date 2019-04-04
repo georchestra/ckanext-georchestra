@@ -9,28 +9,6 @@ from ckan import model
 log = logging.getLogger()
 
 
-def preseed(context):
-    """
-    Clean the ckan instance
-    create some common orgs, some deprecated ones and leave some uncreated
-    :return:
-    """
-    create(context, {'id': 'fake', 'name': 'fake'})
-    # for org in ['psc', 'c2c', 'cra']:
-    for org in ['c2c']:
-        try:
-            toolkit.get_action('organization_purge')(context.copy(), {'id': org})
-            log.debug("purged organization {0}".format(org))
-            org = toolkit.get_action('organization_show')(context.copy(), {'id': org})
-            log.debug("organization {0} already exists".format(org))
-        except toolkit.ObjectNotFound:
-            # Means the organization was not found => we create it
-            if org in ['c2c', 'psc']:
-                create(context, {'id': org, 'name': org})
-        except Exception as e:
-            log.error(e, exc_info=True)
-
-
 def update_or_create(context, org, force_update=False):
     try:
         ckanorg = toolkit.get_action('organization_show')(context.copy(), {'id': org['id'], 'include_extras': True})
@@ -108,6 +86,36 @@ def delete_all_orgs(context, delete_active=False):
                 delete(context, org['id'])
     except Exception, e:
         log.error(e, exc_info=True)
+
+def organization_set_member_or_create(self, user_id, org_id, role):
+    """
+    Set user as member of the organization, with the given role.
+    If the organization doesn't exist, create the organization, setting only it's ID. The remaining information will
+    be completed on next full sync (paster command)
+    :param self:
+    :param user_id:
+    :param org_id:
+    :param role:
+    :return:
+    """
+    try:
+        toolkit.get_action('organization_member_create')(self.context.copy(), {'id': org_id, 'username': user_id,
+                                                                               'role': role})
+        log.debug("added user to {0}".format(org_id))
+
+    except toolkit.ValidationError:
+        # Means it doesn't exist yet => we create it
+        log.debug("Creating organization {0}".format(org_id))
+        #his_org = toolkit.get_action('organization_create')(self.context.copy(), {'name': org_id,
+        #                                                                          'extras': [{
+        #                                                                                'key': 'needs_sync',
+        #                                                                                'value':True
+        #                                                                            }]
+        #                                                                          })
+        his_org = toolkit.get_action('organization_create')(self.context.copy(), {'name': org_id})
+        log.debug("adding user to {0}".format(org_id))
+        toolkit.get_action('organization_member_create')(self.context.copy(), {'id': org_id, 'username': user_id,
+                                                                               'role': role})
 
 def flush():
     model.Session.commit()
