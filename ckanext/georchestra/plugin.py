@@ -139,7 +139,7 @@ class GeorchestraPlugin(plugins.SingletonPlugin):
                 self.create_user(userdict)
 
             toolkit.c.user = username
-            toolkit.c.user_obj = ckan_user
+            #toolkit.c.user_obj = ckan_user
         else:
             toolkit.c.user = None
 
@@ -166,6 +166,7 @@ class GeorchestraPlugin(plugins.SingletonPlugin):
             'ckanext.georchestra.external_users': {'default': 'ckan'},
             'ckanext.georchestra.orphans.users.purge': {'default': True, 'parse': toolkit.asbool},
             'ckanext.georchestra.orphans.users.orgname': {'default': 'orphan_users'},
+            'ckanext.georchestra.organization.ghosts.prefix': {'default': '[GHOST] '},
         }
         errors = []
         for i in schema:

@@ -16,35 +16,38 @@ def get_ldap_connection():
     cnx = ldap.initialize(config['ckanext.georchestra.ldap.uri'], bytes_mode=False,
                           trace_level=config['ckanext.georchestra.ldap.trace_level'])
 
-    if config.get('ckanext.georchestra.ldap.auth.dn'):
-        try:
-            if config['ckanext.georchestra.ldap.auth.method'] == 'SIMPLE':
-                cnx.bind_s(config['ckanext.georchestra.ldap.auth.dn'],
-                           config['ckanext.georchestra.ldap.auth.password'])
-            elif config['ckanext.georchestra.ldap.auth.method'] == 'SASL':
-                if config['ckanext.georchestra.ldap.auth.mechanism'] == 'DIGEST-MD5':
-                    auth_tokens = ldap.sasl.digest_md5(config['ckanext.georchestra.ldap.auth.dn'],
-                                                       config['ckanext.georchestra.ldap.auth.password'])
-                    cnx.sasl_interactive_bind_s("", auth_tokens)
-                else:
-                    log.error("SASL mechanism not supported: {0}".format(
-                        config['ckanext.georchestra.ldap.auth.mechanism']))
-                    return None
+    if not config.get('ckanext.georchestra.ldap.auth.dn'):
+        # don't authenticate
+        return cnx
+
+    try:
+        if config['ckanext.georchestra.ldap.auth.method'] == 'SIMPLE':
+            cnx.bind_s(config['ckanext.georchestra.ldap.auth.dn'],
+                       config['ckanext.georchestra.ldap.auth.password'])
+        elif config['ckanext.georchestra.ldap.auth.method'] == 'SASL':
+            if config['ckanext.georchestra.ldap.auth.mechanism'] == 'DIGEST-MD5':
+                auth_tokens = ldap.sasl.digest_md5(config['ckanext.georchestra.ldap.auth.dn'],
+                                                   config['ckanext.georchestra.ldap.auth.password'])
+                cnx.sasl_interactive_bind_s("", auth_tokens)
             else:
-                log.error(
-                    "LDAP authentication method is not supported: {0}".format(
-                        config['ckanext.georchestra.ldap.auth.method']))
+                log.error("SASL mechanism not supported: {0}".format(
+                    config['ckanext.georchestra.ldap.auth.mechanism']))
                 return None
-        except ldap.SERVER_DOWN:
-            log.error('LDAP server is not reachable')
-            return None
-        except ldap.INVALID_CREDENTIALS:
+        else:
             log.error(
-                'LDAP server credentials (ckanext.georchestra.ldap.auth.dn and ckanext.georchestra.ldap.auth.password) invalid')
+                "LDAP authentication method is not supported: {0}".format(
+                    config['ckanext.georchestra.ldap.auth.method']))
             return None
-        except ldap.LDAPError, e:
-            log.error("Fatal LDAP Error: {0}".format(e))
-            return None
+    except ldap.SERVER_DOWN:
+        log.error('LDAP server is not reachable')
+        return None
+    except ldap.INVALID_CREDENTIALS:
+        log.error(
+            'LDAP server credentials (ckanext.georchestra.ldap.auth.dn and ckanext.georchestra.ldap.auth.password) invalid')
+        return None
+    except ldap.LDAPError, e:
+        log.error("Fatal LDAP Error: {0}".format(e))
+        return None
     return cnx
 
 
@@ -242,9 +245,9 @@ def user_format_and_complete(cnx, user):
         for m in attr['memberOf']:
             # get roles
 
-            rolere = re.search(u'cn=(.*),{0}'.format(config['ckanext.georchestra.ldap.base_dn.roles']), m)
-            if rolere:
-                rolename = rolere.group(1)
+            role_re = re.search(u'cn=(.*),{0}'.format(config['ckanext.georchestra.ldap.base_dn.roles']), m)
+            if role_re:
+                rolename = role_re.group(1)
                 try:
                     # If this command works, it means the role is listed in the dict, hence CKAN role-related
                     r = ldap_roles_dict[rolename]

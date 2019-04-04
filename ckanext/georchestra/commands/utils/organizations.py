@@ -47,7 +47,7 @@ def update_or_create(context, org, force_update=False):
         if (org['update_ts'] > last_revision) or (len(ckanorg['title']) == 0) or force_update:
             # then we update it
             log.debug("updating organization {0}".format(org['name']))
-            current_org = toolkit.get_action('organization_patch')(context.copy(), org)
+            toolkit.get_action('organization_patch')(context.copy(), org)
         else:
             log.debug("Organization {0} is up-to-date".format(org['id']))
     except toolkit.ObjectNotFound:
@@ -58,6 +58,7 @@ def update_or_create(context, org, force_update=False):
 
 
 def remove(context, orgs_list):
+    ghost_prefix = toolkit.config['ckanext.georchestra.organization.ghosts.prefix']
     for id in orgs_list:
         org = toolkit.get_action('organization_show')(context.copy(), {'id': id})
         if org['package_count'] == 0:
@@ -67,8 +68,8 @@ def remove(context, orgs_list):
             # TODO: discuss the proper way to manage ghost orgs
             # If we purge an org owning datasets, it will make them hard to manage.
             log.debug("renamed organization {0}".format(id))
-            if not org['title'].startswith("[GHOST] "):
-                org['title'] = "[GHOST] " + org['title']
+            if not org['title'].startswith(ghost_prefix):
+                org['title'] = ghost_prefix + org['title']
                 #org['name'] = "ghost_" + org['name'] # makes datasets impossible to retrieve...
                 current_org = toolkit.get_action('organization_patch')(context.copy(), org)
             for u in org['users']:
