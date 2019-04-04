@@ -11,6 +11,8 @@ import ckan.plugins.toolkit as toolkit
 from ckan.plugins.toolkit import config
 import ckan.lib.dictization.model_dictize as model_dictize
 import ckanext.georchestra.utils.organizations as organizations_utils
+import ckanext.georchestra.utils.users as user_utils
+import ckanext.georchestra.utils.ldap_utils as ldap_utils
 
 HEADER_USERNAME = "sec-username"
 HEADER_ROLES = "sec-roles"
@@ -47,12 +49,7 @@ class GeorchestraPlugin(plugins.SingletonPlugin):
     #TODO improve IConfigurer implementation ?
 
     prefix = config['ckanext.georchestra.role.prefix']
-    ldap_roles_dict = {
-        prefix + config['ckanext.georchestra.role.sysadmin']: 'sysadmin',
-        prefix + config['ckanext.georchestra.role.orgadmin']: 'admin',
-        prefix + config['ckanext.georchestra.role.editor']: 'editor'
-    }
-    sync_done = False
+    ldap_roles_dict = ldap_utils.get_ldap_roles_list(prefix)
 
     def get_auth_functions(self):
         """Implementation of IAuthFunctions.get_auth_functions"""
@@ -118,7 +115,7 @@ class GeorchestraPlugin(plugins.SingletonPlugin):
             'name': username,
             'fullname': firstname + ' ' + lastname,
             'password': '12345678',
-            'org': org,
+            'org_id': org,
             'role': role,
             'sysadmin': (role=='sysadmin'),
             'state': 'active'
@@ -129,9 +126,7 @@ class GeorchestraPlugin(plugins.SingletonPlugin):
             # TODO don't check at every call find a way to store the info it was already synced
             # Check if the user needs to be updated
             check_fields = ['name', 'email', 'fullname', 'sysadmin', 'state']
-            checks = [(ckan_user[f] != userdict[f]) for f in check_fields]
-            needs_update = reduce(lambda x, y: x or y, checks)
-            if needs_update:
+            if user_utils.needs_updating(check_fields, ckan_user, userdict):
                 ckan_user = toolkit.get_action('user_update')(self.context, userdict)
                 log.debug("updated user {0}".format(userdict['name']))
             else:
@@ -140,19 +135,20 @@ class GeorchestraPlugin(plugins.SingletonPlugin):
             if role == 'sysadmin':
                 # if sysadmin, we only need to check if the org needs to be created
                 try:
-                    toolkit.get_action('organization_create')(self.context.copy(), {'name': userdict['org']})
+                    toolkit.get_action('organization_create')(self.context.copy(), {'name': userdict['org_id']})
                 except Exception, e:
                     # organization most likely exists, which will fail the create action. We ignore this.
                     pass
             else:
                 # check if user membership needs updating and if needs organization to be created
-                self.organization_sync_for_user(userdict['id'], userdict['org'], userdict['role'])
+                self.organization_sync_for_user(userdict['id'], userdict['org_id'], userdict['role'])
         except toolkit.ObjectNotFound:
             # Means it doesn't exist yet => we create it
-            self.create_user(userdict)
+            user_utils.create(userdict)
 
         toolkit.c.user = username
         #toolkit.c.user_obj = ckan_user # seems not necessary. Raises an error when the user is new
+
 
     def configure(self, main_config):
         """Implementation of IConfigurable.configure"""
@@ -210,14 +206,6 @@ class GeorchestraPlugin(plugins.SingletonPlugin):
         for key, value in main_config.iteritems():
             if isinstance(value, str):
                 main_config[key] = six.text_type(value, encoding='utf-8')
-
-    def create_user(self, userdict):
-        try:
-            ckan_user = toolkit.get_action('user_create')(self.context.copy(), userdict)
-            log.debug("created user {0}".format(userdict['id']))
-            self.organization_set_member_or_create(userdict['id'], userdict['org'], userdict['role'])
-        except toolkit.ValidationError as e:
-            log.error("User parameters are invalid. Could not create the user. {0}".format(e))
 
     def organization_sync_for_user(self, user_id, org_id, role):
         """

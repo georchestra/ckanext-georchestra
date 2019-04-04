@@ -7,12 +7,14 @@ import ckan.tests.helpers as helpers
 import ckan.plugins as plugins
 from ckan.plugins.toolkit import NotAuthorized, ObjectNotFound
 import ckan.tests.factories as factories
+import ckanext.georchestra.utils.users as users
 
 
-class TestGeorchestraPlugin(object):
+class TestCommandUserUtilsPlugin(object):
     '''Tests for the ckanext.georchestra.plugin module.
 
     '''
+
     @classmethod
     def setup_class(cls):
         '''Nose runs this method once to setup our test class.'''
@@ -36,8 +38,21 @@ class TestGeorchestraPlugin(object):
         # tests that run after ours.
         plugins.unload('georchestra')
 
-    def test_dummytest(self):
-        nosetools.assert_true('a'+'a' == 'aa')
+    def test_user_delete_but_org_dont_exist(self):
+        context = {'ignore_auth': True, 'user': 'ckan_default'}
+        org_name = 'orphans'
+        user = factories.User()
+        users.delete(context, user['id'], False, org_name)
+        org_object = plugins.toolkit.get_action('organization_show')(context.copy(), {'id': org_name, 'include_users':True})
+        nosetools.assert_equal(len(org_object['users']), 1)
 
-    def test_dummyfailedtest(self):
-        nosetools.assert_equal('a'+'a','aa')
+    def test_user_delete(self):
+        context = {'ignore_auth': True, 'user': 'ckan_default'}
+        org_name = 'orphans'
+        user = factories.User()
+        user2 = factories.User()
+        org = factories.Organization(name=org_name, users=[{'name': user2['id'], 'capacity': 'member'}])
+        users.delete(context, user['id'], False, org_name)
+        org_object = plugins.toolkit.get_action('organization_show')(context.copy(), {'id': org['id'], 'include_users':True})
+        usernames = [u['name'] for u in org_object['users']]
+        nosetools.assert_in(user['name'], usernames)

@@ -214,6 +214,14 @@ def users_scan_and_process(cnx, process, context):
             break
     return processed_users
 
+def get_ldap_roles_list(prefix=''):
+    ldap_roles_dict = {
+        prefix + config['ckanext.georchestra.role.sysadmin']: 'sysadmin',
+        prefix + config['ckanext.georchestra.role.orgadmin']: 'admin',
+        prefix + config['ckanext.georchestra.role.editor']: 'editor'
+    }
+    return ldap_roles_dict
+
 def user_format_and_complete(cnx, user):
     """
     Add role information from LDAP
@@ -238,7 +246,6 @@ def user_format_and_complete(cnx, user):
                  'role': 'member'
                 }
 
-    prefix = config['ckanext.georchestra.role.prefix']
     ldap_roles_dict = {
         config['ckanext.georchestra.role.sysadmin']: 'sysadmin',
         config['ckanext.georchestra.role.orgadmin']: 'admin',
@@ -264,7 +271,7 @@ def user_format_and_complete(cnx, user):
             org_re = re.search(u'cn=(.*),{0}'.format(config['ckanext.georchestra.ldap.base_dn.orgs']), m, re.U)
             if org_re:
                 orgname = org_re.group(1)
-                user_dict['orgid'] = sanitize(orgname)
+                user_dict['org_id'] = sanitize(orgname)
 
     except ldap.LDAPError as e:
         log.error('LDAP search failed: %s' % e)

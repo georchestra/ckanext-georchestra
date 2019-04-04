@@ -87,7 +87,7 @@ def delete_all_orgs(context, delete_active=False):
     except Exception, e:
         log.error(e, exc_info=True)
 
-def organization_set_member_or_create(self, user_id, org_id, role):
+def organization_set_member_or_create(context, user_id, org_id, role):
     """
     Set user as member of the organization, with the given role.
     If the organization doesn't exist, create the organization, setting only it's ID. The remaining information will
@@ -99,22 +99,16 @@ def organization_set_member_or_create(self, user_id, org_id, role):
     :return:
     """
     try:
-        toolkit.get_action('organization_member_create')(self.context.copy(), {'id': org_id, 'username': user_id,
+        toolkit.get_action('organization_member_create')(context.copy(), {'id': org_id, 'username': user_id,
                                                                                'role': role})
         log.debug("added user to {0}".format(org_id))
 
     except toolkit.ValidationError:
         # Means it doesn't exist yet => we create it
         log.debug("Creating organization {0}".format(org_id))
-        #his_org = toolkit.get_action('organization_create')(self.context.copy(), {'name': org_id,
-        #                                                                          'extras': [{
-        #                                                                                'key': 'needs_sync',
-        #                                                                                'value':True
-        #                                                                            }]
-        #                                                                          })
-        his_org = toolkit.get_action('organization_create')(self.context.copy(), {'name': org_id})
+        toolkit.get_action('organization_create')(context.copy(), {'name': org_id})
         log.debug("adding user to {0}".format(org_id))
-        toolkit.get_action('organization_member_create')(self.context.copy(), {'id': org_id, 'username': user_id,
+        toolkit.get_action('organization_member_create')(context.copy(), {'id': org_id, 'username': user_id,
                                                                                'role': role})
 
 def flush():
