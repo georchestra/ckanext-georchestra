@@ -202,3 +202,33 @@ To publish a new version to PyPI follow these steps:
 
        git tag 0.0.2
        git push --tags
+
+---------------------
+Configuration options
+---------------------
+The plugin provides the **required** following required configuration items:
+
+- `ckanext.georchestra.ldap.uri`: your LDAP server URI (e.g.`ldap://localhost:389`)
+- `ckanext.georchestra.ldap.base_dn`: your LDAP base DN (e.g. `dc=georchestra,dc=org`)
+- `ckanext.georchestra.ldap.base_dn.orgs`: the DN associated to the organization objects (e.g. `ou=orgs,dc=georchestra,dc=org`)
+- `ckanext.georchestra.ldap.base_dn.roles`: the DN associated to the organization objects (e.g. `ou=roles,dc=georchestra,dc=org`)
+- `ckanext.georchestra.ldap.base_dn.users`: the DN associated to the organization objects (e.g. `ou=users,dc=georchestra,dc=org`)
+- `ckanext.georchestra.ldap.auth.dn`: the admin user dn (e.g.`cn=admin,dc=georchestra,dc=org`)
+- `ckanext.georchestra.ldap.auth.password`: the admin user's password
+
+Additionally, the plugin provides the following optional parameters:
+
+- `ckanext.georchestra.ldap.users.nosync`: comma-separated list of users that we should not sync to CKAN (default: `geoserver_privileged_user`)
+- `ckanext.georchestra.ldap.auth.method`: LDAP authentication method (default: `SIMPLE`)
+- #ckanext.georchestra.ldap.auth.mechanism`: if `ckanext.georchestra.ldap.auth.method` is set to SASL, the authentication mechanism used (default: `DIGEST-MD5`)
+- `ckanext.georchestra.ldap.trace_level`: LDAP logging level (default: 0)
+- `ckanext.georchestra.role.prefix`: role prefix used in the header's roles list (default: `ROLE_`)
+- `ckanext.georchestra.role.sysadmin`: CKAN sysadmin  role name as defined in georchestra's console (default: `CKAN_SYSADMIN`)
+- `ckanext.georchestra.role.orgadmin`: CKAN admin role name as defined in georchestra's console (default: `CKAN_ADMIN`)
+- `ckanext.georchestra.role.editor`: CKAN editor role name as defined in georchestra's console (default: `CKAN_EDITOR`)
+- `ckanext.georchestra.external_users`: used to keep root sysadmin user out of the sync process (we don't want it removed...) (default: `ckan`)
+- # If True, ckan users that don't belong to any LDAP organization are deleted
+- # if False, they are removed from all organizations and added to a orphan_users org
+- `ckanext.georchestra.orphans.users.purge`: If True, ckan users that don't belong to the LDAP base are purged from the database. If False, they are removed from all organizations and added to a orphan_users org (default `True`)
+- `ckanext.georchestra.orphans.users.orgname`: orphan_sers organization name (default: ` orphan_users`)
+- `ckanext.georchestra.organization.ghosts.prefix`: Prefix added to organizations' title that should be deleted but still contain datasets: they are referred as ghost, pending cleaning , for further deletion (default `[GHOST] `)
