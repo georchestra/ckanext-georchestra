@@ -25,6 +25,7 @@ class GeorchestraLDAPCommand(CkanCommand):
 
     cnx = None
     ldap_orgs_list = None
+    georchestra_ldap = None
 
     def command(self):
 
@@ -55,22 +56,22 @@ class GeorchestraLDAPCommand(CkanCommand):
         # TODO: define the log level in config parameter
         log.setLevel(logging.DEBUG)
 
-        ldap_cnx= ldap_utils.get_ldap_connection()
-        self.sync_organizations(ldap_cnx)
-        self.sync_users(ldap_cnx)
+        self.georchestra_ldap = ldap_utils.GeorchestraLdap()
+        self.sync_organizations()
+        self.sync_users()
 
 
-    def sync_organizations(self, ldap_cnx):
+    def sync_organizations(self):
         #org_utils.preseed(self.clean_context())
-        processed_orgs = ldap_utils.orgs_scan_and_process(ldap_cnx, org_utils.update_or_create, self.clean_context())
+        processed_orgs = self.georchestra_ldap.orgs_scan_and_process(org_utils.update_or_create, self.clean_context())
         ckan_orgs_names_list = self.get_ckan_orgs()
 
         orgs_to_delete = set(ckan_orgs_names_list) - set (processed_orgs)
         org_utils.remove(self.clean_context(), orgs_to_delete)
         log.info("Synchronized {0} orgs".format(len(processed_orgs)))
 
-    def sync_users(self, ldap_cnx):
-        processed_users = ldap_utils.users_scan_and_process(ldap_cnx, user_utils.update_or_create, self.clean_context())
+    def sync_users(self, ):
+        processed_users = self.georchestra_ldap.users_scan_and_process(user_utils.update_or_create, self.clean_context())
         ckan_users_list = self.get_ckan_users()
 
         # keep root sysadmin users (like the one running this current command) out of the sync process (we don't want
