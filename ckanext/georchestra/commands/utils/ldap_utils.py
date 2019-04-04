@@ -1,6 +1,9 @@
+# encoding: utf-8
+
 import logging
 import dateutil
 import re
+import six
 
 import ldap, ldap.filter
 from ldap.controls.libldap import SimplePagedResultsControl
@@ -8,6 +11,7 @@ from ldap.controls.libldap import SimplePagedResultsControl
 from ckan.plugins.toolkit import config
 
 log = logging.getLogger()
+
 
 def get_ldap_connection():
     """
@@ -130,7 +134,7 @@ def org_format_and_complete(cnx, org):
 
     see_also_links = attr['seeAlso']
     for link in see_also_links:
-        res = cnx.search_s(unicode(link, encoding='utf-8'), ldap.SCOPE_BASE,
+        res = cnx.search_s(six.text_type(link, encoding='utf-8'), ldap.SCOPE_BASE,
                            filterstr=u'(objectClass=*)', attrlist=None)
         if res[0][0].startswith('o='):
             try :
@@ -245,7 +249,7 @@ def user_format_and_complete(cnx, user):
         for m in attr['memberOf']:
             # get roles
 
-            role_re = re.search(u'cn=(.*),{0}'.format(config['ckanext.georchestra.ldap.base_dn.roles']), m)
+            role_re = re.search(u'cn=(.*),{0}'.format(config['ckanext.georchestra.ldap.base_dn.roles']), m, re.U)
             if role_re:
                 rolename = role_re.group(1)
                 try:
@@ -257,9 +261,9 @@ def user_format_and_complete(cnx, user):
                     # means it is not CKAN roles-related membership. No interest for us. Not an error, though
                     pass
             # get the organization he is member of (if there is)
-            orgre = re.search(u'cn=(.*),{0}'.format(config['ckanext.georchestra.ldap.base_dn.orgs']), m)
-            if orgre:
-                orgname = orgre.group(1)
+            org_re = re.search(u'cn=(.*),{0}'.format(config['ckanext.georchestra.ldap.base_dn.orgs']), m, re.U)
+            if org_re:
+                orgname = org_re.group(1)
                 user_dict['orgid'] = sanitize(orgname)
 
     except ldap.LDAPError as e:
@@ -284,4 +288,4 @@ def getFirstValue(attr_list):
     """
     if not attr_list:
         return u''
-    return unicode(attr_list[0], encoding='utf-8')
+    return six.text_type(attr_list[0], encoding='utf-8')

@@ -1,4 +1,7 @@
+# encoding: utf-8
+
 import logging
+import six
 
 from hashlib import md5
 
@@ -198,7 +201,7 @@ class GeorchestraPlugin(plugins.SingletonPlugin):
         # make sure all the strings in the config are unicode formatted
         for key, value in main_config.iteritems():
             if isinstance(value, str):
-                main_config[key] = unicode(value, encoding='utf-8')
+                main_config[key] = six.text_type(value, encoding='utf-8')
 
     def create_user(self, userdict):
         try:

@@ -1,3 +1,5 @@
+# encoding: utf-8
+
 import logging
 import dateutil
 
@@ -18,7 +20,7 @@ def update_or_create(context, user, force_update=False):
         checks = [(ckan_user[f] != user[f]) for f in check_fields]
         needs_update = reduce(lambda x, y: x or y, checks)
         if needs_update or force_update:
-            ckan_user = toolkit.get_action('user_update')(context.copy(), user)
+            toolkit.get_action('user_update')(context.copy(), user)
             log.debug("updated user {0}".format(user['name']))
         else:
             log.debug("user {0} is up-to-date".format(user['name']))

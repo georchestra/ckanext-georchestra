@@ -1,10 +1,10 @@
+# encoding: utf-8
+
 import logging
-import dateutil
 
 from ckan.lib.cli import CkanCommand
 from ckan.plugins import toolkit
 from ckan.plugins.toolkit import config
-from ckan import model
 
 from ckanext.georchestra.commands.utils import ldap_utils
 from ckanext.georchestra.commands.utils import organizations as org_utils
