@@ -75,24 +75,42 @@ def create(context, user):
     return ckan_user
 
 
-def delete(context, id, purge=True):
+def delete(context, id, purge=True, orphan_org_name='orphan_users'):
     """
     remove a user from the users list
     :param id(string): id of the user to delete
-    :param purge (Boolean): purge or simply set as 'state':'deleted'. (optional, default:True)
+    :param purge (Boolean): purge if True. If False, it moves the user to an 'orphan_users' org and removes it from
+     any other organization (optional, default:True)
     :return:
     """
-    try:
-        if purge:
-            # toolkit.get_action('user_delete')(self.context, {'id': orphan})
-            # Beware : user_delete doesn't purge the user, it just shows it as deleted state.
-            # This is how to do it (cf https://stackoverflow.com/questions/33881318/how-to-completely-delete-a-ckan-user)
-            model.User.get(id).purge()
-            flush()
-        else:
-            toolkit.get_action('user_delete')(context.copy(), {'id': id})
-    except toolkit.ObjectNotFound, e:
-        log.error("Not found orphan user when trying to remove it: {0}".format(e))
+    if purge:
+        # toolkit.get_action('user_delete')(self.context, {'id': orphan})
+        # Beware : user_delete doesn't purge the user, it just shows it as deleted state.
+        # This is how to do it (cf https://stackoverflow.com/questions/33881318/how-to-completely-delete-a-ckan-user)
+        model.User.get(id).purge()
+        flush()
+    else:
+        #toolkit.get_action('user_delete')(context.copy(), {'id': id})
+        # create orphan org if it doesn't exist
+        try:
+            toolkit.get_action('organization_create')(context.copy(), {'name':orphan_org_name})
+        except Exception:
+            # the org already exists
+            pass
+
+        try:
+            # Add user to this org
+            toolkit.get_action('organization_member_create')(context.copy(), {'id': orphan_org_name, 'username':id})
+
+            # Remove user from other orgs
+            user_orgs = toolkit.get_action('organization_list_for_user')(context.copy(), {'id': id})
+            for org in user_orgs:
+                if org['name'] == orphan_org_name:
+                    continue
+                toolkit.get_action('member_delete')(context.copy(), {'id': org['id'], 'object':id, 'object_type':'user'})
+        except Exception as e:
+            log.error(e, exc_info=True)
+
 
 
 def flush():

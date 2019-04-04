@@ -78,7 +78,7 @@ class GeorchestraLDAPCommand(CkanCommand):
         notouch_userids = config['ckanext.georchestra.external_users'].split(",")
         users_to_delete = set(ckan_users_list) - set(processed_users + notouch_userids)
         for orphan in users_to_delete:
-            user_utils.delete(self.clean_context(), orphan, config['ckanext.georchestra.orphans.users.purge'])
+            user_utils.delete(self.clean_context(), orphan, config['ckanext.georchestra.orphans.users.purge'], config['ckanext.georchestra.orphans.users.orgname'])
         log.info("Synchronized {0} users".format(len(processed_users)))
 
     def get_ckan_orgs(self):
