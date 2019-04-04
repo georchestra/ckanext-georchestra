@@ -144,7 +144,7 @@ class GeorchestraPlugin(plugins.SingletonPlugin):
                 self.organization_sync_for_user(userdict['id'], userdict['org_id'], userdict['role'])
         except toolkit.ObjectNotFound:
             # Means it doesn't exist yet => we create it
-            user_utils.create(userdict)
+            user_utils.create(self.context, userdict)
 
         toolkit.c.user = username
         #toolkit.c.user_obj = ckan_user # seems not necessary. Raises an error when the user is new
@@ -242,7 +242,7 @@ class GeorchestraPlugin(plugins.SingletonPlugin):
                                                                                   'username': user_id})
 
         if his_org is None:
-            organizations_utils.organization_set_member_or_create(user_id, org_id, role)
+            organizations_utils.organization_set_member_or_create(self.context, user_id, org_id, role)
 
 
 class ConfigError(Exception):
