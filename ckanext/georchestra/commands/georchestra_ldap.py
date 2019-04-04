@@ -62,7 +62,6 @@ class GeorchestraLDAPCommand(CkanCommand):
 
 
     def sync_organizations(self):
-        #org_utils.preseed(self.clean_context())
         processed_orgs = self.georchestra_ldap.orgs_scan_and_process(org_utils.update_or_create, self.clean_context())
         ckan_orgs_names_list = self.get_ckan_orgs()
 

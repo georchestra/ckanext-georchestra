@@ -89,7 +89,7 @@ def delete(context, id, purge=True, orphan_org_name='orphan_users'):
     :return:
     """
     if purge:
-        # toolkit.get_action('user_delete')(self.context, {'id': orphan})
+        # toolkit.get_action('user_delete')(context.copy(), {'id': orphan})
         # Beware : user_delete doesn't purge the user, it just shows it as deleted state.
         # This is how to do it (cf https://stackoverflow.com/questions/33881318/how-to-completely-delete-a-ckan-user)
         model.User.get(id).purge()

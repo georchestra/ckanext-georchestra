@@ -22,6 +22,10 @@ def get_ldap_roles_list(prefix=''):
 
 class GeorchestraLdap():
     cnx = None
+    nosync_users_list = None
+
+    def __init__(self):
+        self.nosync_users_list = config['ckanext.georchestra.ldap.users.nosync'].split(",")
 
     def _create_ldap_connection(self):
         """
@@ -73,12 +77,42 @@ class GeorchestraLdap():
             self._create_ldap_connection()
         return self.cnx
 
-    def orgs_scan_and_process(self, process, context):
+    def orgs_scan_and_process(self, external_process, context):
         """
-        Retrieve every LDAP organization and apply the 'process' on each entry
+        Retrieve every LDAP organization and apply the 'external_process' on each entry
+        Search is paginated to support more than 1000 entries
+        :param external_process (function): the function to apply to each LDAP entry returned by the search
+        :param context: the ckan context
+        :return: the list of the org names that have been processed
+        """
+        dn = config['ckanext.georchestra.ldap.base_dn.orgs']
+        filter = u'(objectClass=groupOfMembers)'
+        attributes = [u'dn', u'cn', u'o', u'member', u'seeAlso', u'modifytimestamp']
+        processed_orgs = self._paginate_scan_and_process(dn, filter, attributes, self._process_org,
+                                                          external_process, context)
+        return processed_orgs
+
+    def users_scan_and_process(self, external_process, context):
+        """
+        Retrieve every LDAP user and apply the 'external_process' on each entry
+        Search is paginated to support more than 1000 entries
+        :param external_process (function): the function to apply to each LDAP entry returned by the search
+        :param context: the ckan context
+        :return: the list of the user names that have been processed
+        """
+        dn = config['ckanext.georchestra.ldap.base_dn.users']
+        filter = u'(objectClass=organizationalPerson)'
+        attributes = [u'dn', u'uid', u'cn', u'description', u'givenName', u'mail', u'sn', u'memberOf']
+        processed_users = self._paginate_scan_and_process(dn, filter, attributes, self._process_user,
+                                                          external_process, context)
+        return processed_users
+
+    def _paginate_scan_and_process(self, dn, filter, attributes, process_item, external_process, context):
+        """
+        Retrieve every LDAP user and apply the 'process' on each entry
         Search is paginated to support more than 1000 entries
         :param process (function): the function to apply to each LDAP entry returned by the search
-        :return: the list of the org names that have been processed
+        :return: the list of the user names that have been processed
         """
         cnx = self.get_ldap_connection()
 
@@ -87,17 +121,17 @@ class GeorchestraLdap():
 
         result = []
         pages = 0
-        processed_orgs=[]
+        processed_items=[]
         # Do searches until we run out of "pages" to get from
         # the LDAP server.
         while True:
             pages += 1
             # Send search request
             try:
-                response = cnx.search_ext(config['ckanext.georchestra.ldap.base_dn.orgs'],
+                response = cnx.search_ext(dn,
                                       ldap.SCOPE_ONELEVEL,
-                                      u'(objectClass=groupOfMembers)',
-                                      attrlist=[u'dn', u'cn', u'o', u'member', u'seeAlso', u'modifytimestamp'],
+                                      filter,
+                                      attrlist=attributes,
                                       serverctrls=[page_control])
             except ldap.LDAPError as e:
                 log.error('LDAP search failed: %s' % e)
@@ -113,10 +147,9 @@ class GeorchestraLdap():
             # and attrs is a dictionary containing the attributes associated
             # with the entry. The keys of attrs are strings, and the associated
             # values are lists of strings.
-            for org in rdata:
-                org = self.org_format_and_complete(org)
-                process(context, org)
-                processed_orgs.append(org['id'])
+            for item in rdata:
+                processed_id = process_item(item, external_process, context)
+                processed_items.append(processed_id)
 
             # Get cookie for next request
             result.extend(rdata)
@@ -133,10 +166,36 @@ class GeorchestraLdap():
             page_control.cookie = controls[0].cookie
             if not controls[0].cookie:
                 break
-        return processed_orgs
+        return processed_items
 
+    def _process_org(self, org, external_process, context):
+        """
+        Applied to every organization entry listed during the LDAP scan
+        :param org:
+        :param external_process:
+        :param context:
+        :return:
+        """
+        org = self._org_format_and_complete(org)
+        external_process(context, org)
+        return org['id']
 
-    def org_format_and_complete(self, org):
+    def _process_user(self, user, external_process, context):
+        """
+        Applied to every user entry listed during the LDAP scan
+        :param user:
+        :param external_process:
+        :param context:
+        :return:
+        """
+        # filter out nosync users like geoserver_privileged_user
+        if user[1]['uid'][0] in self.nosync_users_list:
+            return None
+        user = self._user_format_and_complete(user)
+        external_process(context, user)
+        return user['id']
+
+    def _org_format_and_complete(self, org):
         """
         Gets complementary attributes from LDAP (organization information is split into 3 objects)
         :param org:
@@ -168,74 +227,7 @@ class GeorchestraLdap():
 
         return organization
 
-    def users_scan_and_process(self, process, context):
-        """
-        Retrieve every LDAP user and apply the 'process' on each entry
-        Search is paginated to support more than 1000 entries
-        :param process (function): the function to apply to each LDAP entry returned by the search
-        :return: the list of the user names that have been processed
-        """
-        cnx = self.get_ldap_connection()
-
-        nosync_users_list = config['ckanext.georchestra.ldap.users.nosync'].split(",")
-
-        # Create the page control to work from
-        page_control = SimplePagedResultsControl(True, size=1000, cookie='')
-
-        result = []
-        pages = 0
-        processed_users=[]
-        # Do searches until we run out of "pages" to get from
-        # the LDAP server.
-        while True:
-            pages += 1
-            # Send search request
-            try:
-                response = cnx.search_ext(config['ckanext.georchestra.ldap.base_dn.users'],
-                                      ldap.SCOPE_ONELEVEL,
-                                      u'(objectClass=organizationalPerson)',
-                                      attrlist=[u'dn', u'uid', u'cn', u'description', u'givenName', u'mail', u'sn', u'memberOf'],
-                                      serverctrls=[page_control])
-            except ldap.LDAPError as e:
-                log.error('LDAP search failed: %s' % e)
-
-            # Pull the results from the search request
-            try:
-                rtype, rdata, rmsgid, serverctrls = cnx.result3(response)
-            except ldap.LDAPError as e:
-                log.error('Could not pull LDAP results: %s' % e)
-
-            # Each "rdata" is a tuple of the form (dn, attrs), where dn is
-            # a string containing the DN (distinguished name) of the entry,
-            # and attrs is a dictionary containing the attributes associated
-            # with the entry. The keys of attrs are strings, and the associated
-            # values are lists of strings.
-            for user in rdata:
-                #filter out nosync users like geoserver_privileged_user
-                if user[1]['uid'][0] in nosync_users_list:
-                    continue
-                user = self.user_format_and_complete(user)
-                process(context, user)
-                processed_users.append(user['id'])
-
-            # Get cookie for next request
-            result.extend(rdata)
-            controls = [control for control in serverctrls
-                        if control.controlType == SimplePagedResultsControl.controlType]
-            if not controls:
-                print('The server ignores RFC 2696 control')
-                break
-
-            # Ok, we did find the page control, yank the cookie from it and
-            # insert it into the control for our next search. If however there
-            # is no cookie, we are done!
-
-            page_control.cookie = controls[0].cookie
-            if not controls[0].cookie:
-                break
-        return processed_users
-
-    def user_format_and_complete(self, user):
+    def _user_format_and_complete(self, user):
         """
         Add role information from LDAP
         Warning : does not support pagination: we suppose a given user will have less than 1000 roles !
