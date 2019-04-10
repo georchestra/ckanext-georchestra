@@ -90,23 +90,23 @@ class GeorchestraPlugin(plugins.SingletonPlugin):
         self.context = {'user': user['name']}
 
         headers = toolkit.request.headers
-        username = headers.get(HEADER_USERNAME)
+        username = six.text_type(ldap_utils.sanitize(headers.get(HEADER_USERNAME)), encoding='utf-8')
         if not username:
             toolkit.c.user = None
             return
 
-        email = headers.get(HEADER_EMAIL) or 'empty@empty.org'
+        email = six.text_type(headers.get(HEADER_EMAIL), encoding='utf-8') or u'empty@empty.org'
         #emailhash = md5(email.strip().lower().encode('utf8')).hexdigest()
-        firstname = headers.get(HEADER_FIRSTNAME) or 'john'
-        lastname = headers.get(HEADER_LASTNAME) or 'doe'
-        roles = headers.get(HEADER_ROLES)
-        org = headers.get(HEADER_ORG)
-        role = 'member' # default
+        firstname = six.text_type(headers.get(HEADER_FIRSTNAME), encoding='utf-8') or u'john'
+        lastname = six.text_type(headers.get(HEADER_LASTNAME), encoding='utf-8') or u'doe'
+        roles = six.text_type(headers.get(HEADER_ROLES), encoding='utf-8')
+        org = six.text_type(ldap_utils.sanitize(headers.get(HEADER_ORG)), encoding='utf-8')
+        role = u'member' # default
         if roles:
             for r in roles.split(";"):
                 # roles in headers are comma-separated but somehow end up being semicolon-separated here...
                 if r in self.ldap_roles_dict:
-                    role = self.ldap_roles_dict[r]
+                    role = six.text_type(self.ldap_roles_dict[r], encoding='utf-8')
                     break
         log.debug('identified user {0} with role {1}'.format(username, role))
         userdict = {
