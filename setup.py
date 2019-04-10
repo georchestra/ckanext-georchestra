@@ -54,7 +54,7 @@ setup(
     # You can just specify the packages manually here if your project is
     # simple. Or you can use find_packages().
     packages=find_packages(exclude=['contrib', 'docs', 'tests*']),
-    namespace_packages=['ckanext'],
+    namespace_packages=['ckanext','ckanext.georchestra'],
 
     install_requires=[
       # CKAN extensions should not list dependencies here, but in a separate
@@ -81,10 +81,13 @@ setup(
     # pip to create the appropriate form of executable for the target platform.
     entry_points='''
         [ckan.plugins]
-        georchestra=ckanext.georchestra.plugin:GeorchestraPlugin
+            georchestra=ckanext.georchestra.plugin:GeorchestraPlugin
+        
+        [paste.paster_command]
+            georchestra=ckanext.georchestra.commands.georchestra_ldap:GeorchestraLDAPCommand
 
         [babel.extractors]
-        ckan = ckan.lib.extract:extract_ckan
+            ckan = ckan.lib.extract:extract_ckan
     ''',
 
     # If you are changing from the default layout of your extension, you may
