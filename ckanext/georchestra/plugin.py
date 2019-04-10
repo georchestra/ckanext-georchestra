@@ -26,17 +26,17 @@ log = logging.getLogger(__name__)
 
 def organization_edit(context, data_dict=None):
     return {'success': False,
-            'msg': 'Managed by Georchestra LDAP console'}
+            'msg': 'Managed by geOrchestra LDAP console'}
 
 def user_edit(context, data_dict=None):
     return {'success': False,
-            'msg': 'Managed by Georchestra LDAP console'}
+            'msg': 'Managed by geOrchestra LDAP console'}
 
 
 
 class GeorchestraPlugin(plugins.SingletonPlugin):
     """
-    Georchestra plugin
+    geOrchestra plugin
 
     This plugin plugin synchronizes the users, organizations and user membership with a georchestra LDAP instance.
     On user access, it performs a quick check and sync on this user only.
@@ -181,7 +181,7 @@ class GeorchestraPlugin(plugins.SingletonPlugin):
             if i in main_config:
                 v = main_config[i]
             elif i.replace('ckanext.', '') in main_config:
-                log.warning('Georchestra configuration options should be prefixed with \'ckanext.\'. ' +
+                log.warning('geOrchestra configuration options should be prefixed with \'ckanext.\'. ' +
                             'Please update {0} to {1}'.format(i.replace('ckanext.', ''), i))
 
             if v:
