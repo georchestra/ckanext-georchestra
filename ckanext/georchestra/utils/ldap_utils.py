@@ -35,18 +35,18 @@ class GeorchestraLdap():
         self.cnx = ldap.initialize(config['ckanext.georchestra.ldap.uri'], bytes_mode=False,
                               trace_level=config['ckanext.georchestra.ldap.trace_level'])
 
-        if not config.get('ckanext.georchestra.ldap.auth.dn'):
+        if not config.get('ckanext.georchestra.ldap.admin.dn'):
             # don't authenticate
             return
 
         try:
             if config['ckanext.georchestra.ldap.auth.method'] == 'SIMPLE':
-                self.cnx.bind_s(config['ckanext.georchestra.ldap.auth.dn'],
-                           config['ckanext.georchestra.ldap.auth.password'])
+                self.cnx.bind_s(config['ckanext.georchestra.ldap.admin.dn'],
+                           config['ckanext.georchestra.ldap.admin.password'])
             elif config['ckanext.georchestra.ldap.auth.method'] == 'SASL':
                 if config['ckanext.georchestra.ldap.auth.mechanism'] == 'DIGEST-MD5':
-                    auth_tokens = ldap.sasl.digest_md5(config['ckanext.georchestra.ldap.auth.dn'],
-                                                       config['ckanext.georchestra.ldap.auth.password'])
+                    auth_tokens = ldap.sasl.digest_md5(config['ckanext.georchestra.ldap.admin.dn'],
+                                                       config['ckanext.georchestra.ldap.admin.password'])
                     self.cnx.sasl_interactive_bind_s("", auth_tokens)
                 else:
                     log.error("SASL mechanism not supported: {0}".format(
@@ -62,7 +62,7 @@ class GeorchestraLdap():
             return
         except ldap.INVALID_CREDENTIALS:
             log.error(
-                'LDAP server credentials (ckanext.georchestra.ldap.auth.dn and ckanext.georchestra.ldap.auth.password) invalid')
+                'LDAP server credentials (ckanext.georchestra.ldap.admin.dn and ckanext.georchestra.ldap.admin.password) invalid')
             return
         except ldap.LDAPError, e:
             log.error("Fatal LDAP Error: {0}".format(e))
@@ -85,7 +85,7 @@ class GeorchestraLdap():
         :param context: the ckan context
         :return: the list of the org names that have been processed
         """
-        dn = config['ckanext.georchestra.ldap.base_dn.orgs']
+        dn = config['ckanext.georchestra.ldap.orgs.rdn'] + u',' + config['ckanext.georchestra.ldap.base_dn']
         filter = u'(objectClass=groupOfMembers)'
         attributes = [u'dn', u'cn', u'o', u'member', u'seeAlso', u'modifytimestamp']
         processed_orgs = self._paginate_scan_and_process(dn, filter, attributes, self._process_org,
@@ -100,7 +100,7 @@ class GeorchestraLdap():
         :param context: the ckan context
         :return: the list of the user names that have been processed
         """
-        dn = config['ckanext.georchestra.ldap.base_dn.users']
+        dn = config['ckanext.georchestra.ldap.users.rdn'] + u',' + config['ckanext.georchestra.ldap.base_dn']
         filter = u'(objectClass=organizationalPerson)'
         attributes = [u'dn', u'uid', u'cn', u'description', u'givenName', u'mail', u'sn', u'memberOf']
         processed_users = self._paginate_scan_and_process(dn, filter, attributes, self._process_user,
@@ -197,7 +197,7 @@ class GeorchestraLdap():
 
     def _org_format_and_complete(self, org):
         """
-        Gets complementary attributes from LDAP (organization information is split into 3 objects)
+        Gets complementary attributes from LDAP (organization information is split into 2 objects)
         :param org:
         :return:formatted organization dict, compliant with CKAN
         """
@@ -261,7 +261,8 @@ class GeorchestraLdap():
             for m in attr['memberOf']:
                 # get roles
 
-                role_re = re.search(u'cn=(.*),{0}'.format(config['ckanext.georchestra.ldap.base_dn.roles']), m, re.U)
+                role_re = re.search(u'cn=(.*),{0},{1}'.format(config['ckanext.georchestra.ldap.roles.rdn'],
+                                                             config['ckanext.georchestra.ldap.base_dn']), m, re.U)
                 if role_re:
                     rolename = role_re.group(1)
                     try:
@@ -273,11 +274,15 @@ class GeorchestraLdap():
                         # means it is not CKAN roles-related membership. No interest for us. Not an error, though
                         pass
                 # get the organization he is member of (if there is)
-                org_re = re.search(u'cn=(.*),{0}'.format(config['ckanext.georchestra.ldap.base_dn.orgs']), m, re.U)
+                org_re = re.search(u'cn=(.*),{0},{1}'.format(config['ckanext.georchestra.ldap.orgs.rdn'],
+                                                             config['ckanext.georchestra.ldap.base_dn']), m, re.U)
                 if org_re:
                     orgname = org_re.group(1)
                     user_dict['org_id'] = sanitize(orgname)
 
+        except KeyError as e:
+            # means is not member of anything
+            pass
         except ldap.LDAPError as e:
             log.error('LDAP search failed: %s' % e)
 

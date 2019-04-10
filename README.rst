@@ -37,7 +37,7 @@ ckanext-georchestra
    Consider including some screenshots or embedding a video!
 
 This ckan extension provides user, organization and user membership (in organizations) synchronization from
-georchestra LDAP instance. User, organization and membership are managed in the georchestra console.
+geOrchestra LDAP instance. User, organization and membership are managed in the geOrchestra console.
 
 On user access, if the user profile needs to be updated, it is done on-the-fly : user profile sync, membership, and if
 necessary the organization is created. In that case, the organization is really an empty shell (only the id is provided)
@@ -45,7 +45,7 @@ and the rest is set up on next full sync.
 
 Full Synchronization is done running paster command::
 
-   /usr/lib/ckan/default/bin/paster --plugin=ckanext-georchestra georchestra ldap_sync_all -c  ~/docker-ckan/ckan/root/etc/ckan/development.ini
+   /usr/lib/ckan/default/bin/paster --plugin=ckanext-georchestra geOrchestra ldap_sync_all -c /etc/ckan/development.ini
 
 This should be run on a regular basis, like in a cron task.
 
@@ -55,7 +55,7 @@ Requirements
 
 - CKAN 2.8.2
 - geOrchestra Security Proxy
-- Georchestra LDAP instance
+- geOrchestra LDAP instance
 
 
 ------------
@@ -109,11 +109,11 @@ do::
 
     ckanext.georchestra.ldap.uri = ldap://localhost:3899
     ckanext.georchestra.ldap.base_dn = dc=georchestra,dc=org
-    ckanext.georchestra.ldap.base_dn.orgs = ou=orgs,dc=georchestra,dc=org
-    ckanext.georchestra.ldap.base_dn.roles = ou=roles,dc=georchestra,dc=org
-    ckanext.georchestra.ldap.base_dn.users = ou=users,dc=georchestra,dc=org
-    ckanext.georchestra.ldap.auth.dn = cn=admin,dc=georchestra,dc=org
-    ckanext.georchestra.ldap.auth.password = secret
+    ckanext.georchestra.ldap.orgs.rdn = ou=orgs
+    ckanext.georchestra.ldap.roles.rdn = ou=roles
+    ckanext.georchestra.ldap.users.rdn = ou=users
+    ckanext.georchestra.ldap.admin.dn = cn=admin,dc=georchestra,dc=org
+    ckanext.georchestra.ldap.admin.password = secret
 
 5. run::
 
@@ -210,25 +210,23 @@ The plugin provides the **required** following required configuration items:
 
 - `ckanext.georchestra.ldap.uri`: your LDAP server URI (e.g.`ldap://localhost:389`)
 - `ckanext.georchestra.ldap.base_dn`: your LDAP base DN (e.g. `dc=georchestra,dc=org`)
-- `ckanext.georchestra.ldap.base_dn.orgs`: the DN associated to the organization objects (e.g. `ou=orgs,dc=georchestra,dc=org`)
-- `ckanext.georchestra.ldap.base_dn.roles`: the DN associated to the organization objects (e.g. `ou=roles,dc=georchestra,dc=org`)
-- `ckanext.georchestra.ldap.base_dn.users`: the DN associated to the organization objects (e.g. `ou=users,dc=georchestra,dc=org`)
-- `ckanext.georchestra.ldap.auth.dn`: the admin user dn (e.g.`cn=admin,dc=georchestra,dc=org`)
-- `ckanext.georchestra.ldap.auth.password`: the admin user's password
+- `ckanext.georchestra.ldap.orgs.rdn`: the relative DN associated to the organization objects (e.g. `ou=orgs`)
+- `ckanext.georchestra.ldap.roles.rdn`: the relative DN associated to the organization objects (e.g. `ou=roles`)
+- `ckanext.georchestra.ldap.users.rdn`: the relative DN associated to the organization objects (e.g. `ou=users`)
+- `ckanext.georchestra.ldap.admin.dn`: the admin user dn (e.g.`cn=admin,dc=georchestra,dc=org`)
+- `ckanext.georchestra.ldap.admin.password`: the admin user's password
 
 Additionally, the plugin provides the following optional parameters:
 
 - `ckanext.georchestra.ldap.users.nosync`: comma-separated list of users that we should not sync to CKAN (default: `geoserver_privileged_user`)
 - `ckanext.georchestra.ldap.auth.method`: LDAP authentication method (default: `SIMPLE`)
-- #ckanext.georchestra.ldap.auth.mechanism`: if `ckanext.georchestra.ldap.auth.method` is set to SASL, the authentication mechanism used (default: `DIGEST-MD5`)
+- `ckanext.georchestra.ldap.auth.mechanism`: if `ckanext.georchestra.ldap.auth.method` is set to SASL, the authentication mechanism used (default: `DIGEST-MD5`)
 - `ckanext.georchestra.ldap.trace_level`: LDAP logging level (default: 0)
 - `ckanext.georchestra.role.prefix`: role prefix used in the header's roles list (default: `ROLE_`)
-- `ckanext.georchestra.role.sysadmin`: CKAN sysadmin  role name as defined in georchestra's console (default: `CKAN_SYSADMIN`)
-- `ckanext.georchestra.role.orgadmin`: CKAN admin role name as defined in georchestra's console (default: `CKAN_ADMIN`)
-- `ckanext.georchestra.role.editor`: CKAN editor role name as defined in georchestra's console (default: `CKAN_EDITOR`)
-- `ckanext.georchestra.external_users`: used to keep root sysadmin user out of the sync process (we don't want it removed...) (default: `ckan`)
-- # If True, ckan users that don't belong to any LDAP organization are deleted
-- # if False, they are removed from all organizations and added to a orphan_users org
-- `ckanext.georchestra.orphans.users.purge`: If True, ckan users that don't belong to the LDAP base are purged from the database. If False, they are removed from all organizations and added to a orphan_users org (default `True`)
-- `ckanext.georchestra.orphans.users.orgname`: orphan_sers organization name (default: ` orphan_users`)
-- `ckanext.georchestra.organization.ghosts.prefix`: Prefix added to organizations' title that should be deleted but still contain datasets: they are referred as ghost, pending cleaning , for further deletion (default `[GHOST] `)
+- `ckanext.georchestra.role.sysadmin`: CKAN sysadmin  role name as defined in geOrchestra's console (default: `CKAN_SYSADMIN`)
+- `ckanext.georchestra.role.orgadmin`: CKAN admin role name as defined in geOrchestra's console (default: `CKAN_ADMIN`)
+- `ckanext.georchestra.role.editor`: CKAN editor role name as defined in geOrchestra's console (default: `CKAN_EDITOR`)
+- `ckanext.geOrchestra.external_users`: used to keep root sysadmin user out of the sync process (we don't want it removed...) (default: `ckan`)
+- `ckanext.georchestra.orphans.users.purge`: If True, ckan users that don't belong to the LDAP base are purged from the database. If False, they are removed from all organizations and added to a orphan_users org (default `False`)
+- `ckanext.georchestra.orphans.users.orgname`: orphan_users organization name (default: ` orphan_users`)
+- `ckanext.georchestra.organization.ghosts.prefix`: Prefix added to the title of organizations that should be deleted but still contain datasets: they are referred as ghost, pending cleaning , for further deletion (default `[GHOST] `)
