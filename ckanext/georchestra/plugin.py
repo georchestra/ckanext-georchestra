@@ -48,8 +48,6 @@ class GeorchestraPlugin(plugins.SingletonPlugin):
     plugins.implements(plugins.IAuthFunctions)
     #TODO improve IConfigurer implementation ?
 
-    prefix = config['ckanext.georchestra.role.prefix']
-    ldap_roles_dict = ldap_utils.get_ldap_roles_list(prefix)
 
     def get_auth_functions(self):
         """Implementation of IAuthFunctions.get_auth_functions"""
@@ -103,10 +101,12 @@ class GeorchestraPlugin(plugins.SingletonPlugin):
         roles = headers.get(HEADER_ROLES)
         org = ldap_utils.sanitize(headers.get(HEADER_ORG))
         role = u'member' # default
+        prefix = config['ckanext.georchestra.role.prefix']
+        ldap_roles_dict = ldap_utils.get_ldap_roles_list(prefix)
         if roles:
             for r in roles.split(";"):
-                if r in self.ldap_roles_dict:
-                    role = self.ldap_roles_dict[r]
+                if r in ldap_roles_dict:
+                    role = ldap_roles_dict[r]
                     break
         log.debug('identified user {0} with role {1}'.format(username, role))
         userdict = {
