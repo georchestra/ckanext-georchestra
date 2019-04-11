@@ -90,23 +90,23 @@ class GeorchestraPlugin(plugins.SingletonPlugin):
         self.context = {'user': user['name']}
 
         headers = toolkit.request.headers
-        username = six.text_type(ldap_utils.sanitize(headers.get(HEADER_USERNAME)), encoding='utf-8')
+        username = headers.get(HEADER_USERNAME)
         if not username:
             toolkit.c.user = None
             return
 
-        email = six.text_type(headers.get(HEADER_EMAIL), encoding='utf-8') or u'empty@empty.org'
+        username = ldap_utils.sanitize(username)
+        email = headers.get(HEADER_EMAIL) or u'empty@empty.org'
         #emailhash = md5(email.strip().lower().encode('utf8')).hexdigest()
-        firstname = six.text_type(headers.get(HEADER_FIRSTNAME), encoding='utf-8') or u'john'
-        lastname = six.text_type(headers.get(HEADER_LASTNAME), encoding='utf-8') or u'doe'
-        roles = six.text_type(headers.get(HEADER_ROLES), encoding='utf-8')
-        org = six.text_type(ldap_utils.sanitize(headers.get(HEADER_ORG)), encoding='utf-8')
+        firstname = headers.get(HEADER_FIRSTNAME) or u'john'
+        lastname = headers.get(HEADER_LASTNAME) or u'doe'
+        roles = headers.get(HEADER_ROLES)
+        org = ldap_utils.sanitize(headers.get(HEADER_ORG))
         role = u'member' # default
         if roles:
             for r in roles.split(";"):
-                # roles in headers are comma-separated but somehow end up being semicolon-separated here...
                 if r in self.ldap_roles_dict:
-                    role = six.text_type(self.ldap_roles_dict[r], encoding='utf-8')
+                    role = self.ldap_roles_dict[r]
                     break
         log.debug('identified user {0} with role {1}'.format(username, role))
         userdict = {
@@ -114,11 +114,11 @@ class GeorchestraPlugin(plugins.SingletonPlugin):
             'email': email,
             'name': username,
             'fullname': firstname + ' ' + lastname,
-            'password': '12345678',
+            'password': u'12345678',
             'org_id': org,
             'role': role,
-            'sysadmin': (role=='sysadmin'),
-            'state': 'active'
+            'sysadmin': (role==u'sysadmin'),
+            'state': u'active'
         }
         try:
             ckan_user = toolkit.get_action('user_show')(self.context, {'id': userdict['name']})

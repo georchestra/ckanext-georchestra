@@ -14,9 +14,9 @@ log = logging.getLogger()
 
 def get_ldap_roles_list(prefix=''):
     ldap_roles_dict = {
-        prefix + config['ckanext.georchestra.role.sysadmin']: 'sysadmin',
-        prefix + config['ckanext.georchestra.role.orgadmin']: 'admin',
-        prefix + config['ckanext.georchestra.role.editor']: 'editor'
+        prefix + config['ckanext.georchestra.role.sysadmin']: u'sysadmin',
+        prefix + config['ckanext.georchestra.role.orgadmin']: u'admin',
+        prefix + config['ckanext.georchestra.role.editor']: u'editor'
     }
     return ldap_roles_dict
 
@@ -295,6 +295,8 @@ def sanitize(s):
     :param s:
     :return:
     """
+    if not s:
+        return ''
     return re.sub(r'[^\w-]', '_',s).lower()
 
 def getFirstValue(attr_list):
