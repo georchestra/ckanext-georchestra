@@ -52,8 +52,8 @@ class GeorchestraPlugin(plugins.SingletonPlugin):
     def get_auth_functions(self):
         """Implementation of IAuthFunctions.get_auth_functions"""
         return {
-            'organization_update': organization_edit,
-            'user_update':user_edit
+            #'organization_update': organization_edit,
+            #'user_update':user_edit
         }
 
     def update_config(self, config):
