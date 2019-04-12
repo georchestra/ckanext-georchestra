@@ -96,7 +96,7 @@ class GeorchestraPlugin(plugins.SingletonPlugin):
         username = ldap_utils.sanitize(username)
         email = headers.get(HEADER_EMAIL) or u'empty@empty.org'
         #emailhash = md5(email.strip().lower().encode('utf8')).hexdigest()
-        firstname = headers.get(HEADER_FIRSTNAME or u'john'
+        firstname = headers.get(HEADER_FIRSTNAME) or u'john'
         lastname = headers.get(HEADER_LASTNAME) or u'doe'
         roles = headers.get(HEADER_ROLES)
         org = ldap_utils.sanitize(headers.get(HEADER_ORG))
