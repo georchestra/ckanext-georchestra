@@ -52,8 +52,8 @@ class GeorchestraPlugin(plugins.SingletonPlugin):
     def get_auth_functions(self):
         """Implementation of IAuthFunctions.get_auth_functions"""
         return {
-            'organization_update': organization_edit,
-            'user_update':user_edit
+            #'organization_update': organization_edit,
+            #'user_update':user_edit
         }
 
     def update_config(self, config):
@@ -96,7 +96,7 @@ class GeorchestraPlugin(plugins.SingletonPlugin):
         username = ldap_utils.sanitize(username)
         email = headers.get(HEADER_EMAIL) or u'empty@empty.org'
         #emailhash = md5(email.strip().lower().encode('utf8')).hexdigest()
-        firstname = headers.get(HEADER_FIRSTNAME) or u'john'
+        firstname = headers.get(HEADER_FIRSTNAME or u'john'
         lastname = headers.get(HEADER_LASTNAME) or u'doe'
         roles = headers.get(HEADER_ROLES)
         org = ldap_utils.sanitize(headers.get(HEADER_ORG))
@@ -202,10 +202,6 @@ class GeorchestraPlugin(plugins.SingletonPlugin):
                 main_config[i] = schema[i]['default']
         if len(errors):
             raise ConfigError("\n".join(errors))
-        # make sure all the strings in the config are unicode formatted
-        for key, value in main_config.iteritems():
-            if isinstance(value, str):
-                main_config[key] = six.text_type(value, encoding='utf-8')
 
     def organization_sync_for_user(self, user_id, org_id, role):
         """
