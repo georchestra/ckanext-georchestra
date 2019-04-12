@@ -45,7 +45,7 @@ and the rest is set up on next full sync.
 
 Full Synchronization is done running paster command::
 
-   /usr/lib/ckan/default/bin/paster --plugin=ckanext-georchestra geOrchestra ldap_sync_all -c /etc/ckan/development.ini
+   /usr/lib/ckan/default/bin/paster --plugin=ckanext-georchestra georchestra ldap_sync_all -c /etc/ckan/development.ini
 
 This should be run on a regular basis, like in a cron task.
 
