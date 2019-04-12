@@ -190,7 +190,10 @@ class GeorchestraPlugin(plugins.SingletonPlugin):
                 try:
                     if 'validate' in schema[i]:
                         (schema[i]['validate'])(v)
-                    main_config[i] = v
+                    if isinstance(v, str):
+                        main_config[i] = six.text_type(v, encoding='utf-8')
+                    else:
+                        main_config[i] = v
                 except ConfigError as e:
                     errors.append(str(e))
             elif schema[i].get('required', False):
