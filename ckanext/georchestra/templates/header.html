@@ -1,6 +1,7 @@
 {% ckan_extends %}
 
-<!-- Remove user settings edition button & log_out/login buttons -->
+<!-- Template override for core ckan header
+     Adjust log_out/login buttons -->
 {% block header_account_log_out_link %}
         <li>
           <a href="{{ h.url_for('/georchestra_logout') }}" title="{{ _('Log out') }}">
