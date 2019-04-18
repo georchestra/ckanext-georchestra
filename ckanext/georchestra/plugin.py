@@ -2,8 +2,7 @@
 
 import logging
 import six
-
-from hashlib import md5
+from routes.mapper import SubMapper
 
 import ckan.plugins as plugins
 import ckan.model as model
@@ -46,6 +45,7 @@ class GeorchestraPlugin(plugins.SingletonPlugin):
     plugins.implements(plugins.IConfigurable)
     plugins.implements(plugins.IConfigurer)
     plugins.implements(plugins.IAuthFunctions)
+    plugins.implements(plugins.IRoutes, inherit=True)
     #TODO improve IConfigurer implementation ?
 
 
@@ -63,6 +63,17 @@ class GeorchestraPlugin(plugins.SingletonPlugin):
         # 'templates' is the path to the templates dir, relative to this
         # plugin.py file.
         toolkit.add_template_directory(config, 'templates')
+
+
+    # IRoutes
+    def before_map(self, map):
+        controller = 'ckanext.georchestra.controller:GeorchestraController'
+        with SubMapper(map, controller=controller) as m:
+            m.connect('ckanext_georchestra_logout',
+                      '/georchestra_logout', action='georchestra_logout'),
+            m.connect('ckanext_georchestra_login',
+                      '/georchestra_login', action='georchestra_login')
+        return map
 
     # ignore basic auth actions
     def login(self):
@@ -95,7 +106,6 @@ class GeorchestraPlugin(plugins.SingletonPlugin):
 
         username = ldap_utils.sanitize(username)
         email = headers.get(HEADER_EMAIL) or u'empty@empty.org'
-        #emailhash = md5(email.strip().lower().encode('utf8')).hexdigest()
         firstname = headers.get(HEADER_FIRSTNAME) or u'john'
         lastname = headers.get(HEADER_LASTNAME) or u'doe'
         roles = headers.get(HEADER_ROLES)
