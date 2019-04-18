@@ -1,22 +1,31 @@
 # encoding: utf-8
 import six
+import urlparse
+import urllib
 
-import ckan.lib.base as base
-import ckan.lib.helpers as h
-import ckan.plugins.toolkit as t
+from ckan.lib import base, helpers
+from ckan.plugins import toolkit
 
 render = base.render
 
 
 class GeorchestraController(base.BaseController):
+    '''
+    Define custom controllers for login/logout using geOrchestra
+    '''
 
     def georchestra_logout(self):
         '''Override logout with geOrchestra's logout'''
         return h.redirect_to(u'/logout')
 
     def georchestra_login(self):
-        '''Override login with geOrchestra's login pattern'''
-        referrer = six.text_type(t.request.referrer, encoding='utf-8')
-        url = referrer+u'&login' if '?' in referrer else referrer+u'?login'
-        return h.redirect_to(url)
+        '''Override login with geOrchestra's login pattern
+        Adds login=true to the current URL
+        '''
+        parsed = urlparse.urlsplit(toolkit.request.referer)
+        query = urlparse.parse_qs(parsed.query)
+        query['login'] = [u'true']
+        parsed = parsed._replace(query=urllib.urlencode(query, True))
+        url = urlparse.urlunsplit(parsed)
+        return helpers.redirect_to(url)
 
