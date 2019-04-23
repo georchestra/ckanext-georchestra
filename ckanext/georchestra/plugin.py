@@ -277,9 +277,5 @@ def _allowed_auth_mechanisms(v):
         raise ConfigError('Only DIGEST-MD5 is supported as an authentication mechanism')
 
 def _get_from_environment(key):
-    env_var_name = CONFIG_FROM_ENV_VARS.get(key, None)
-    if not env_var_name:
-        return None
-
-    env_var_value = environ.get(env_var_name, None)
-    return env_var_value
+    env_var_name = CONFIG_FROM_ENV_VARS.get(key, '')
+    return environ.get(env_var_name, None)
