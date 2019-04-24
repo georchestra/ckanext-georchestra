@@ -16,7 +16,7 @@ class GeorchestraController(base.BaseController):
 
     def georchestra_logout(self):
         '''Override logout with geOrchestra's logout'''
-        return h.redirect_to(u'/logout')
+        return helpers.redirect_to(u'/logout')
 
     def georchestra_login(self):
         '''Override login with geOrchestra's login pattern
