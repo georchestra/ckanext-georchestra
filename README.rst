@@ -229,4 +229,15 @@ Additionally, the plugin provides the following optional parameters:
 - `ckanext.geOrchestra.external_users`: used to keep root sysadmin user out of the sync process (we don't want it removed...) (default: `ckan`)
 - `ckanext.georchestra.orphans.users.purge`: If True, ckan users that don't belong to the LDAP base are purged from the database. If False, they are removed from all organizations and added to a orphan_users org (default `False`)
 - `ckanext.georchestra.orphans.users.orgname`: orphan_users organization name (default: ` orphan_users`)
-- `ckanext.georchestra.organization.ghosts.prefix`: Prefix added to the title of organizations that should be deleted but still contain datasets: they are referred as ghost, pending cleaning , for further deletion (default `[GHOST] `)
+- `ckanext.georchestra.organization.ghosts.prefix`: Prefix added to the title of organizations that should be deleted but still contain datasets: they are referred as ghost, pending cleaning , for further deletion (default `[GHOST]`)
+
+
+Setting configuration through environment variables
+---------------------------------------------------
+Some configuration options can be set using environment variables. The list is given in the plugin.py file :
+```
+CONFIG_FROM_ENV_VARS = {
+    'ckanext.georchestra.ldap.uri': 'CKAN_LDAP_URL',
+}
+```
+Variables set using environment variables override file-based ones.

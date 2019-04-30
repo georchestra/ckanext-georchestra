@@ -3,6 +3,7 @@
 import logging
 import six
 from routes.mapper import SubMapper
+from os import environ
 
 import ckan.plugins as plugins
 import ckan.model as model
@@ -20,6 +21,10 @@ HEADER_EMAIL = "sec-email"
 HEADER_FIRSTNAME = "sec-firstname"
 HEADER_LASTNAME = "sec-lastname"
 HEADER_TEL = "sec-tel"
+
+CONFIG_FROM_ENV_VARS = {
+    'ckanext.georchestra.ldap.uri': 'CKAN_LDAP_URL',
+}
 
 log = logging.getLogger(__name__)
 
@@ -187,12 +192,16 @@ class GeorchestraPlugin(plugins.SingletonPlugin):
         }
         errors = []
         for i in schema:
-            v = None
-            if i in main_config:
-                v = main_config[i]
-            elif i.replace('ckanext.', '') in main_config:
-                log.warning('geOrchestra configuration options should be prefixed with \'ckanext.\'. ' +
-                            'Please update {0} to {1}'.format(i.replace('ckanext.', ''), i))
+            v = _get_from_environment(i)
+            # Environment variables take precedence over config file
+            if v:
+                log.debug("reading variable {} from environment".format(i))
+            else:
+                if i in main_config:
+                    v = main_config[i]
+                elif i.replace('ckanext.', '') in main_config:
+                    log.warning('geOrchestra configuration options should be prefixed with \'ckanext.\'. ' +
+                                'Please update {0} to {1}'.format(i.replace('ckanext.', ''), i))
 
             if v:
                 if 'parse' in schema[i]:
@@ -266,3 +275,7 @@ def _allowed_auth_mechanisms(v):
     """Raise an exception if the value is not an allowed authentication mechanism"""
     if v.upper() not in ['DIGEST-MD5',]:  # Only DIGEST-MD5 is supported when the auth method is SASL
         raise ConfigError('Only DIGEST-MD5 is supported as an authentication mechanism')
+
+def _get_from_environment(key):
+    env_var_name = CONFIG_FROM_ENV_VARS.get(key, '')
+    return environ.get(env_var_name, None)
