@@ -1,0 +1,8 @@
+{% ckan_extends %}
+{# Add support for base64 encoded image as organization logo #}
+
+{% set logo_url = organization.image_url if organization.image_url.startswith('data:') else organization.image_display_url %}
+
+{% block image %}
+  <img src="{{ logo_url or h.url_for_static('/base/images/placeholder-organization.png') }}" alt="{{ organization.name }}" class="img-responsive media-image">
+{% endblock %}
