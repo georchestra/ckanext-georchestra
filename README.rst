@@ -241,3 +241,10 @@ CONFIG_FROM_ENV_VARS = {
 }
 ```
 Variables set using environment variables override file-based ones.
+
+---------------------
+SP configuration
+---------------------
+
+From geOrchestra 19.06 on, CKAN requires that the SP **allowSemicolon** setting is switched to true in
+https://github.com/georchestra/datadir/blob/e625656eaa47cb50a36c406dacd11f18d2217307/security-proxy/security-proxy.properties#L170-L172
