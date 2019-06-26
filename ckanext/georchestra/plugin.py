@@ -251,7 +251,7 @@ class GeorchestraPlugin(plugins.SingletonPlugin):
                 his_org = model_dictize.group_dictize(group, self.context)
                 if member.capacity != role:
                     log.debug("found {0}. Update membership".format(org_id))
-                    organizations_utils.organization_set_member_or_create(user_id, org_id, role)
+                    organizations_utils.organization_set_member_or_create(self.context.copy(), user_id, org_id, role)
                 else:
                     log.debug("found {0}. Membership OK".format(org_id))
             else:
