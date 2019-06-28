@@ -71,14 +71,14 @@ class GeorchestraPlugin(plugins.SingletonPlugin):
 
 
     # IRoutes
-    def before_map(self, map):
+    def before_map(self, routes):
         controller = 'ckanext.georchestra.controller:GeorchestraController'
-        with SubMapper(map, controller=controller) as m:
+        with SubMapper(routes, controller=controller) as m:
             m.connect('ckanext_georchestra_logout',
                       '/georchestra_logout', action='georchestra_logout'),
             m.connect('ckanext_georchestra_login',
                       '/georchestra_login', action='georchestra_login')
-        return map
+        return routes
 
     # ignore basic auth actions
     def login(self):
