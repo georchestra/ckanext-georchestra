@@ -2,6 +2,7 @@
 
 import logging
 import dateutil
+from ckan.lib.base import abort
 
 from ckan.plugins import toolkit
 from ckan import model
@@ -98,6 +99,9 @@ def organization_set_member_or_create(context, user_id, org_id, role):
     :param role:
     :return:
     """
+    # we accept orgs that doesn't exist, but we don't accept user without any orgs.
+    if org_id == '':
+        abort(403)
     try:
         toolkit.get_action('organization_member_create')(context.copy(), {'id': org_id, 'username': user_id,
                                                                                'role': role})
