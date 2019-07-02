@@ -1,5 +1,7 @@
 # encoding: utf-8
 
+from __future__ import absolute_import, unicode_literals, print_function
+
 import logging
 import dateutil
 from ckan.lib.base import abort
@@ -101,7 +103,8 @@ def organization_set_member_or_create(context, user_id, org_id, role):
     """
     # we accept orgs that doesn't exist, but we don't accept user without any orgs.
     if org_id == '':
-        abort(403)
+        log.warning('user {} doesn\'t belong to any orgs. aborting with 403 HTTP code'.format(user_id))
+        abort(403, comment='You doesn\'t belong to any orgs. You have no right.')
     try:
         toolkit.get_action('organization_member_create')(context.copy(), {'id': org_id, 'username': user_id,
                                                                                'role': role})
