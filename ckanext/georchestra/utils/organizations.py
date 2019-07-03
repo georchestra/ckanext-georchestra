@@ -104,7 +104,7 @@ def organization_set_member_or_create(context, user_id, org_id, role):
     # we accept orgs that doesn't exist, but we don't accept user without any orgs.
     if org_id == '':
         log.warning('user {} doesn\'t belong to any orgs. aborting with 403 HTTP code'.format(user_id))
-        abort(403, comment='You doesn\'t belong to any orgs. You have no right.')
+        abort(403, comment='You do not belong to any orgs. You do not have any rights.')
     try:
         toolkit.get_action('organization_member_create')(context.copy(), {'id': org_id, 'username': user_id,
                                                                                'role': role})
