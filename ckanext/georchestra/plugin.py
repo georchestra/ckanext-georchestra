@@ -255,7 +255,7 @@ class GeorchestraPlugin(plugins.SingletonPlugin):
                 else:
                     log.debug("found {0}. Membership OK".format(org_id))
             else:
-                log.debug("TODO : remove user from {0}".format(group.id))
+                log.debug("remove user from {0}".format(group.id))
                 toolkit.get_action('organization_member_delete')(self.context.copy(), {'id': group.id,
                                                                                   'username': user_id})
 
