@@ -136,6 +136,8 @@ class GeorchestraPlugin(plugins.SingletonPlugin):
             'state': u'active'
         }
         try:
+            # get the user info. If it does not exist, it will throw an exception. We then create the user in when
+            # dealing with that exception (see below)
             ckan_user = toolkit.get_action('user_show')(self.context, {'id': userdict['name']})
 
             # TODO don't check at every call find a way to store the info it was already synced
@@ -146,19 +148,19 @@ class GeorchestraPlugin(plugins.SingletonPlugin):
                 log.debug("updated user {0}".format(userdict['name']))
             else:
                 log.debug("user {0} is up-to-date".format(userdict['name']))
-
-            if role == 'sysadmin':
-                # if sysadmin, we only need to check if the org needs to be created
-                try:
-                    toolkit.get_action('organization_create')(self.context.copy(), {'name': userdict['org_id']})
-                except Exception, e:
-                    # organization most likely exists, which will fail the create action. We ignore this.
-                    pass
-            else:
-                # check if user membership needs updating and if needs organization to be created
-                self.organization_sync_for_user(userdict['id'], userdict['org_id'], userdict['role'])
+            if userdict['org_id']:
+                if role == 'sysadmin':
+                    # if sysadmin, we only need to check if the org needs to be created
+                    try:
+                        toolkit.get_action('organization_create')(self.context.copy(), {'name': userdict['org_id']})
+                    except Exception, e:
+                        # organization most likely exists, which will fail the create action. We ignore this.
+                        pass
+                else:
+                    # check if user membership needs updating and if needs organization to be created
+                    self.organization_sync_for_user(userdict['id'], userdict['org_id'], userdict['role'])
         except toolkit.ObjectNotFound:
-            # Means it doesn't exist yet => we create it
+            # Means the user doesn't exist yet => we create it
             user_utils.create(self.context, userdict)
 
         toolkit.c.user = username
@@ -228,7 +230,7 @@ class GeorchestraPlugin(plugins.SingletonPlugin):
     def organization_sync_for_user(self, user_id, org_id, role):
         """
         Synchronize on-the-fly organization membership. If organization does not exist, it creates an org with only
-        the name (id). The empty title field will serve to know, as next full sync, that this org needs to be updated
+        the name (id). The empty title field will serve to know, at next full sync, that this org needs to be updated
         (otherwise, the update date being more recent, it wouldn't trigger an update)
         This function needs to go low-level using model, because it is called from identify function, and while in
         identify, the user is not properly identified and the organization_list_for_user action, for instance, fails.
@@ -247,7 +249,7 @@ class GeorchestraPlugin(plugins.SingletonPlugin):
         his_org=None
         for member, group in q.all():
             log.debug('user {0} is member of {1} with role {2}'.format(user_id, group.id, member.capacity))
-            if group.id == org_id:
+            if (group.id == org_id) or (group.name == org_id):
                 his_org = model_dictize.group_dictize(group, self.context)
                 if member.capacity != role:
                     log.debug("found {0}. Update membership".format(org_id))
@@ -255,7 +257,7 @@ class GeorchestraPlugin(plugins.SingletonPlugin):
                 else:
                     log.debug("found {0}. Membership OK".format(org_id))
             else:
-                log.debug("TODO : remove user from {0}".format(group.id))
+                log.debug("remove user from {0}".format(group.id))
                 toolkit.get_action('organization_member_delete')(self.context.copy(), {'id': group.id,
                                                                                   'username': user_id})
 

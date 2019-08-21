@@ -14,7 +14,7 @@ log = logging.getLogger()
 def update_or_create(context, user, force_update=False):
     # note : ckan does not provide revisions for user profile. This means we can't check timestamps.
     # so we use the user's profile, and check for differences on synced attributes
-    #ckan_user = toolkit.get_action('user_show')(context, {'id':user['id']})
+    # ckan_user = toolkit.get_action('user_show')(context, {'id':user['id']})
     try:
         # Update user profile
         ckan_user = toolkit.get_action('user_show')(context.copy(), {'id': user['id']})
@@ -36,13 +36,15 @@ def update_or_create(context, user, force_update=False):
                 user_orgs_list = toolkit.get_action('organization_list_for_user')(context.copy(), {'id': user['id']})
                 for o in user_orgs_list:
                     log.debug("Checking {0} membership for organization {1}".format(user['name'], o['name']))
-                    if ('org_id' in user) and (o['name'] == user['org_id']):
+                    if ('org_id' in user) and (o['name'] == user['org_id']) and (user['org_id']):
                         if o['capacity'] != user['role']:
                             log.debug("changing {0} role for ".format(user['name'], o['name']))
                             toolkit.get_action('organization_member_create')(context.copy(),
                                                                              {'id': o['id'], 'username': user['name'],
                                                                               'role': user['role']})
                         updated_membership = True
+                    elif not (user['org_id']):
+                        pass
                     else:
                         log.debug("removing user {0} from organization {1}".format(user['name'], o['name']))
                         toolkit.get_action('organization_member_delete')(context.copy(), {'id': o['id'],
@@ -51,7 +53,7 @@ def update_or_create(context, user, force_update=False):
                 # this should not happen
                 log.error(e, exc_info=True)
             # He might not have belonged to the current org. This is dealt with here
-            if ('org_id' in user) and ( not updated_membership):
+            if ('org_id' in user) and ( not updated_membership) and (user['org_id']):
                 toolkit.get_action('organization_member_create')(context.copy(),
                                                                  {'id': user['org_id'], 'username': user['name'],
                                                                   'role': user['role']})
@@ -67,7 +69,7 @@ def create(context, user):
         log.debug("create user {0}".format(user['id']))
         ckan_user = toolkit.get_action('user_create')(context.copy(), user)
 
-        if (user['role'] != 'sysadmin') and ('org_id' in user):
+        if (user['role'] != 'sysadmin') and ('org_id' in user) and (user['org_id']):
             # add it as member of the organization
             organizations_utils.organization_set_member_or_create(context.copy(), user['id'], user['org_id'],
                                                                   user['role'])
