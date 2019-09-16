@@ -3,6 +3,7 @@
 import logging
 
 from ckan.plugins import toolkit
+from ckan.logic import ValidationError
 import ckan.model as model
 
 import ckanext.georchestra.utils.organizations as organizations_utils
@@ -60,6 +61,9 @@ def update_or_create(context, user, force_update=False):
     except toolkit.ObjectNotFound:
         # Means it doesn't exist yet => we create it
         create(context, user)
+    except ValidationError as e:
+        # Means it isn't valid
+        log.error("User parameters are invalid. Could not update the user. \n{}".format(e))
 
 
 def create(context, user):
@@ -78,7 +82,7 @@ def create(context, user):
             #                                                  'role': user['role']}
             #                                                 )
     except toolkit.ValidationError as e:
-        log.error("User parameters are invalid. Could not create the user. {0}".format(e))
+        log.error("User parameters are invalid. Could not create the user. \n{0}".format(e))
     return ckan_user
 
 

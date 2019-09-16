@@ -213,28 +213,36 @@ class GeorchestraLdap():
                         'update_ts':dateutil.parser.parse(attr['modifyTimestamp'][0])}
 
         see_also_links = attr['seeAlso']
-        for link in see_also_links:
-            res = cnx.search_s(six.text_type(link, encoding='utf-8'), ldap.SCOPE_BASE,
-                               filterstr=u'(objectClass=*)', attrlist=None)
-            if res[0][0].startswith('o='):
-                try :
-                    organization['description'] = getFirstValue(res[0][1].get('description'))
-                    # retrieve base64-encoded picture
-                    jpeg_photo = res[0][1].get('jpegPhoto')
-                    if jpeg_photo:
-                        image_base_64 = base64.b64encode(jpeg_photo[0])
-                        organization['image_url'] = 'data:image/jpeg;base64, {}'.format(image_base_64)
-                    labeled_uri = getFirstValue(res[0][1].get('labeledURI'))
-                    if labeled_uri:
-                        organization['extras'] = [
-                                { 'key' : 'site', 'value' : labeled_uri }
-                            ]
-                except KeyError as e:
-                    log.error("This should not happen. Error {}".format(e))
-            else:
-                #TODO retrieve the image data and try to store it as base64 encoded URL
-                # org['image_url'] =  'data:image/jpeg;base64, '+res[0][1]['jpegPhoto'][0]
-                pass
+
+        try:
+            for link in see_also_links:
+                res = cnx.search_s(six.text_type(link, encoding='utf-8'), ldap.SCOPE_BASE,
+                                   filterstr=u'(objectClass=*)', attrlist=None)
+                if res[0][0].startswith('o='):
+                    try :
+                        organization['description'] = getFirstValue(res[0][1].get('description'))
+                        # retrieve base64-encoded picture
+                        jpeg_photo = res[0][1].get('jpegPhoto')
+                        if jpeg_photo:
+                            image_base_64 = base64.b64encode(jpeg_photo[0])
+                            organization['image_url'] = 'data:image/jpeg;base64, {}'.format(image_base_64)
+                        labeled_uri = getFirstValue(res[0][1].get('labeledURI'))
+                        if labeled_uri:
+                            organization['extras'] = [
+                                    { 'key' : 'site', 'value' : labeled_uri }
+                                ]
+                    except KeyError as e:
+                        log.error("This should not happen. Error {}".format(e))
+                else:
+                    #TODO retrieve the image data and try to store it as base64 encoded URL
+                    # org['image_url'] =  'data:image/jpeg;base64, '+res[0][1]['jpegPhoto'][0]
+                    pass
+        except ldap.NO_SUCH_OBJECT as e:
+            log.error("{}".format(e))
+            log.error('LDAP error in org entry: ')
+            log.error('{}  -> seeAlso {}\n'.format(organization['dn'], ', '.join(map(str, see_also_links))))
+            # with open('crapped_orgs.txt', 'a') as the_file:
+            #     the_file.write('{}  -> seeAlso {}\n'.format(organization['dn'], ', '.join(map(str, see_also_links))))
 
         return organization
 
