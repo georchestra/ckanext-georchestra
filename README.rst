@@ -2,11 +2,11 @@
    these badges work. The necessary Travis and Coverage config files have been
    generated for you.
 
-.. image:: https://travis-ci.org/jahow/ckanext-georchestra.svg?branch=master
-    :target: https://travis-ci.org/jahow/ckanext-georchestra
+.. image:: https://travis-ci.org/georchestra/ckanext-georchestra.svg?branch=master
+    :target: https://travis-ci.org/georchestra/ckanext-georchestra
 
-.. image:: https://coveralls.io/repos/jahow/ckanext-georchestra/badge.svg
-  :target: https://coveralls.io/r/jahow/ckanext-georchestra
+.. image:: https://coveralls.io/repos/georchestra/ckanext-georchestra/badge.svg
+  :target: https://coveralls.io/r/georchestra/ckanext-georchestra
 
 .. image:: https://pypip.in/download/ckanext-georchestra/badge.svg
     :target: https://pypi.python.org/pypi//ckanext-georchestra/
