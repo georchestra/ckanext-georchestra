@@ -25,8 +25,8 @@ setup(
     url='https://github.com/jahow/ckanext-georchestra',
 
     # Author details
-    author='''Olivier Guyot''',
-    author_email='''olivier.guyot@camptocamp.com''',
+    author='''Jean Pommier''',
+    author_email='''jean.pommier@pi-geosolutions.fr''',
 
     # Choose your license
     license='AGPL',
