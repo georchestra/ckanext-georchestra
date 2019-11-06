@@ -1,5 +1,4 @@
 # encoding: utf-8
-import six
 import urlparse
 import urllib
 
@@ -7,7 +6,6 @@ from ckan.lib import base, helpers
 from ckan.plugins import toolkit
 
 render = base.render
-
 
 class GeorchestraController(base.BaseController):
     '''
