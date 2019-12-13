@@ -63,17 +63,17 @@ Variables set using environment variables override file-based ones.
 
 ## Security Proxy configuration
 
-Obviously, in `security-proxy/targets-mapping.properties`:
+Obviously, in `security-proxy/targets-mapping.properties`
 ```
 ckan=http://ckan:5000/
 ```
 
-In the datadir's `security-proxy/security-mappings.xml`::
+In the datadir's `security-proxy/security-mappings.xml`
 ```
 <intercept-url pattern="/ckan/ckan-admin.*" access="ROLE_CKAN_SYSADMIN" />
 ```
 
-From geOrchestra 19.06 on, CKAN requires that the SP **allowSemicolon** setting is switched to true in
-https://github.com/georchestra/datadir/blob/e625656eaa47cb50a36c406dacd11f18d2217307/security-proxy/security-proxy.properties#L170-L172
+From geOrchestra 19.04 on, CKAN requires that the SP **allowSemicolon** setting is switched to true in
+https://github.com/georchestra/datadir/blob/e625656eaa47cb50a36c406dacd11f18d2217307/security-proxy/security-proxy.properties#L170-L172. This is to allow fanstatic URLs
 
 
