@@ -1,10 +1,4 @@
-===================
-ckanext-georchestra
-===================
-
-.. Put a description of your extension here:
-   What does it do? What features does it have?
-   Consider including some screenshots or embedding a video!
+# ckanext-georchestra
 
 This ckan extension provides user, organization and user membership (in organizations) synchronization from
 geOrchestra LDAP instance. User, organization and membership are managed in the geOrchestra console.
@@ -13,23 +7,23 @@ On user access, if the user profile needs to be updated, it is done on-the-fly :
 necessary the organization is created. In that case, the organization is really an empty shell (only the id is provided)
 and the rest is set up on next full sync.
 
-Full Synchronization is done running paster command::
-
-   /usr/lib/ckan/default/bin/paster --plugin=ckanext-georchestra georchestra ldap_sync_all -c /etc/ckan/development.ini
+Full Synchronization is done running paster command
+```
+/usr/lib/ckan/default/bin/paster --plugin=ckanext-georchestra georchestra ldap_sync_all -c /etc/ckan/development.ini
+```
 
 This should be run on a regular basis, like in a cron task.
 
-------------
-Requirements
-------------
+
+## Requirements
 
 - CKAN 2.8.x
 - geOrchestra Security Proxy
 - geOrchestra LDAP instance
 
----------------------
-Configuration options
----------------------
+
+## Configuration options
+
 The plugin provides the **required** following required configuration items:
 
 - `ckanext.georchestra.ldap.uri`: your LDAP server URI (e.g.`ldap://localhost:389`)
@@ -56,9 +50,9 @@ Additionally, the plugin provides the following optional parameters:
 - `ckanext.georchestra.organization.ghosts.prefix`: Prefix added to the title of organizations that should be deleted but still contain datasets: they are referred as ghost, pending cleaning , for further deletion (default `[GHOST]`)
 
 
-Setting configuration through environment variables
----------------------------------------------------
-Some configuration options can be set using environment variables. The list is given in the plugin.py file :
+## Setting configuration through environment variables
+
+Some configuration options can be set using environment variables. The list is given in the plugin.py file:
 ```
 CONFIG_FROM_ENV_VARS = {
     'ckanext.georchestra.ldap.uri': 'CKAN_LDAP_URL',
@@ -66,9 +60,8 @@ CONFIG_FROM_ENV_VARS = {
 ```
 Variables set using environment variables override file-based ones.
 
----------------------
-SP configuration
----------------------
+
+## Security Proxy configuration
 
 Obviously, in `security-proxy/targets-mapping.properties`:
 ```
