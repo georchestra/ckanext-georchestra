@@ -123,6 +123,7 @@ class GeorchestraLdap():
         result = []
         pages = 0
         processed_items=[]
+        response = None
         # Do searches until we run out of "pages" to get from
         # the LDAP server.
         while True:
@@ -136,6 +137,7 @@ class GeorchestraLdap():
                                       serverctrls=[page_control])
             except ldap.LDAPError as e:
                 log.error('LDAP search failed: %s' % e)
+                return None
 
             # Pull the results from the search request
             try:
