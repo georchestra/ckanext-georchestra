@@ -45,8 +45,9 @@ Additionally, the plugin provides the following optional parameters:
 - `ckanext.georchestra.role.orgadmin`: CKAN admin role name as defined in geOrchestra's console (default: `CKAN_ADMIN`)
 - `ckanext.georchestra.role.editor`: CKAN editor role name as defined in geOrchestra's console (default: `CKAN_EDITOR`)
 - `ckanext.geOrchestra.external_users`: used to keep root sysadmin user out of the sync process (we don't want it removed...) (default: `ckan`)
-- `ckanext.georchestra.orphans.users.purge`: If True, ckan users that don't belong to the LDAP base are purged from the database. If False, they are removed from all organizations and added to a orphan_users org (default `False`)
-- `ckanext.georchestra.orphans.users.orgname`: orphan_users organization name (default: ` orphan_users`)
+- `ckanext.georchestra.orphans.users.purge`: If True, ckan users that don't belong to the LDAP base are purged from the database. If False, they are removed from all organizations and added to a orphan_users org (default `False`).
+In production, it is advised to set purge to True so that people removed from the LDAP are properly removed from the CKAN database too.
+- `ckanext.georchestra.orphans.users.orgname`: orphan_users organization name (default: `orphan_users`)
 - `ckanext.georchestra.organization.ghosts.prefix`: Prefix added to the title of organizations that should be deleted but still contain datasets: they are referred as ghost, pending cleaning , for further deletion (default `[GHOST]`)
 
 
