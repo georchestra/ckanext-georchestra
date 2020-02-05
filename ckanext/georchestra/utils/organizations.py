@@ -27,6 +27,9 @@ def update_or_create(context, org, force_update=False):
         if (org['update_ts'] > last_revision) or (len(ckanorg['title']) == 0) or force_update:
             # then we update it
             log.debug("updating organization {0}".format(org['name']))
+            # We need this to update the logo:
+            if (org['image_url']):
+                org['clear_upload'] = True
             toolkit.get_action('organization_patch')(context.copy(), org)
         else:
             log.debug("Organization {0} is up-to-date".format(org['id']))
