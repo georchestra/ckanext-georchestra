@@ -28,7 +28,7 @@ def update_or_create(context, org, force_update=False):
             # then we update it
             log.debug("updating organization {0}".format(org['name']))
             # We need this to update the logo:
-            if (org['image_url']):
+            if org.get('image_url'):
                 org['clear_upload'] = True
             toolkit.get_action('organization_patch')(context.copy(), org)
         else:
