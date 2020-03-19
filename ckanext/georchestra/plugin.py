@@ -24,6 +24,7 @@ HEADER_TEL = "sec-tel"
 
 CONFIG_FROM_ENV_VARS = {
     'ckanext.georchestra.ldap.uri': 'CKAN_LDAP_URL',
+    'ckanext.georchestra.sync.force_update': 'CKAN_LDAP_SYNC_FORCE',
 }
 
 log = logging.getLogger(__name__)
@@ -195,6 +196,7 @@ class GeorchestraPlugin(plugins.SingletonPlugin):
             'ckanext.georchestra.orphans.users.purge': {'default': False, 'parse': toolkit.asbool},
             'ckanext.georchestra.orphans.users.orgname': {'default': 'orphan_users'},
             'ckanext.georchestra.organization.ghosts.prefix': {'default': '[GHOST] '},
+            'ckanext.georchestra.sync.force_update': {'default': False, 'parse': toolkit.asbool},
         }
         errors = []
         for i in schema:

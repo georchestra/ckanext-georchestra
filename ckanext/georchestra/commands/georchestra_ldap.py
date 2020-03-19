@@ -13,7 +13,6 @@ from ckanext.georchestra.utils import users as user_utils
 
 log = logging.getLogger()
 
-
 class GeorchestraLDAPCommand(CkanCommand):
     """
     Paster function to synchronize the users/organizations with the LDAP directory
@@ -43,6 +42,9 @@ class GeorchestraLDAPCommand(CkanCommand):
         cmd = self.args[0]
 
         if cmd == 'ldap_sync_all':
+            if 'force_update' in self.args:
+                # Override configuration param
+                config['ckanext.georchestra.sync.force_update'] = True
             self.ldap_sync_all()
         elif cmd == 'purge_org': # needs you to provide the org id
             org_utils.delete(self.context, self.args[1])
