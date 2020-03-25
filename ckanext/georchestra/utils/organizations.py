@@ -9,8 +9,9 @@ from ckan import model
 log = logging.getLogger()
 
 
-def update_or_create(context, org, force_update=False):
+def update_or_create(context, org):
     try:
+        force_update = toolkit.config.get('ckanext.georchestra.sync.force_update', False)
         ckanorg = toolkit.get_action('organization_show')(context.copy(), {'id': org['id'], 'include_extras': True})
         revisions = toolkit.get_action('organization_revision_list')(context.copy(), {'id': org['id']})
         # If no error, also means the org exists
@@ -26,9 +27,9 @@ def update_or_create(context, org, force_update=False):
         #  - force_update : mostly for testing purpose
         if (org['update_ts'] > last_revision) or (len(ckanorg['title']) == 0) or force_update:
             # then we update it
-            log.debug("updating organization {0}".format(org['name']))
+            log.debug("{1}updating organization {0}".format(org['name'], 'force-' if force_update else ''))
             # We need this to update the logo:
-            if org.get('image_url'):
+            if 'image_url' in org:
                 org['clear_upload'] = True
             toolkit.get_action('organization_patch')(context.copy(), org)
         else:

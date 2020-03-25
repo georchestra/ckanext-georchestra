@@ -14,6 +14,23 @@ Full Synchronization is done running paster command
 
 This should be run on a regular basis, like in a cron task.
 
+## Criteria of update
+
+**Organizations** in CKAN provide a `organization_revision_list` action, that can give the time of last update. This is 
+compared with the  `modifyTimestamp` (internal) attribute from the LDAP database to decide if the organization needs to 
+be updated. 
+
+**Users** do not provide such a service. In consequence, we compare a 
+[list of fields](https://github.com/georchestra/ckanext-georchestra/blob/master/ckanext/georchestra/utils/users.py#L23)
+to determine if the entry needs updating.
+
+Normally, this should be enough. But in case it is not, you can force the update on every entry:
+- by setting `ckanext.georchestra.sync.force_update` to `True` in the configuration `.ini` file
+- by setting a `CKAN_LDAP_SYNC_FORCE=True` environment variable
+- by adding `force_update` in the paster command, just after `ldap_sync_all`
+
+Each one of those options overrides the previous ones.
+
 
 ## Requirements
 
@@ -57,6 +74,7 @@ Some configuration options can be set using environment variables. The list is g
 ```
 CONFIG_FROM_ENV_VARS = {
     'ckanext.georchestra.ldap.uri': 'CKAN_LDAP_URL',
+    'ckanext.georchestra.sync.force_update': 'CKAN_LDAP_SYNC_FORCE',
 }
 ```
 Variables set using environment variables override file-based ones.

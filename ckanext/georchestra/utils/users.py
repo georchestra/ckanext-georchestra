@@ -13,11 +13,12 @@ import ckanext.georchestra.utils.ldap_utils as ldap_utils
 log = logging.getLogger()
 
 
-def update_or_create(context, user, force_update=False):
+def update_or_create(context, user):
     # note : ckan does not provide revisions for user profile. This means we can't check timestamps.
     # so we use the user's profile, and check for differences on synced attributes
     # ckan_user = toolkit.get_action('user_show')(context, {'id':user['id']})
     try:
+        force_update = toolkit.config.get('ckanext.georchestra.sync.force_update', False)
         # Update user profile
         ckan_user = toolkit.get_action('user_show')(context.copy(), {'id': user['id']})
         check_fields = ['name', 'email', 'about', 'fullname', 'display_name', 'sysadmin', 'state']
@@ -25,7 +26,7 @@ def update_or_create(context, user, force_update=False):
         needs_update = reduce(lambda x, y: x or y, checks)
         if needs_updating(check_fields, ckan_user, user) or force_update:
             toolkit.get_action('user_update')(context.copy(), user)
-            log.debug("updated user {0}".format(user['name']))
+            log.debug("{1}updated user {0}".format(user['name'], 'force-' if force_update else ''))
         else:
             log.debug("user {0} is up-to-date".format(user['name']))
 
