@@ -2,6 +2,7 @@
 
 import logging
 import dateutil
+import time
 
 from ckan.plugins import toolkit
 from ckan import model
@@ -20,7 +21,7 @@ def update_or_create(context, org):
         # TODO: check it is really UTC time always
         last_revision = dateutil.parser.parse(revisions[0]['timestamp'] + 'Z')
 
-        #last_revision = dateutil.parser.parse('20190208085726Z')
+        # last_revision = dateutil.parser.parse('20190208085726Z')
         # we have 3 update cases :
         #  - revision date in the LDAP is more recent than in the ckan db
         #  - the 'title' field is empty, meaning  we created it on-the-fly when a user needed it (see plugin.py)
@@ -29,7 +30,7 @@ def update_or_create(context, org):
             # then we update it
             log.debug("{1}updating organization {0}".format(org['name'], 'force-' if force_update else ''))
             # We need this to update the logo:
-            if 'image_url' in org:
+            if ('image_url' in org) and (org['image_url'] != ckanorg['image_url']): # 2nd part is needed to solve  https://github.com/ckan/ckan/issues/5293
                 org['clear_upload'] = True
             toolkit.get_action('organization_patch')(context.copy(), org)
         else:
@@ -54,11 +55,10 @@ def remove(context, orgs_list):
             log.debug("renamed organization {0}".format(id))
             if not org['title'].startswith(ghost_prefix):
                 org['title'] = ghost_prefix + org['title']
-                #org['name'] = "ghost_" + org['name'] # makes datasets impossible to retrieve...
+                # org['name'] = "ghost_" + org['name'] # makes datasets impossible to retrieve...
                 current_org = toolkit.get_action('organization_patch')(context.copy(), org)
             for u in org['users']:
                 toolkit.get_action('organization_member_delete')(context.copy(), {'id': org['id'], 'username': u['id']})
-
 
 
 def create(context, data_dict):
@@ -77,26 +77,28 @@ def delete(context, id):
         toolkit.get_action('organization_purge')(context.copy(), {'id': id})
         flush()
         log.debug("purged organization {0}".format(id))
-    except toolkit.ValidationError, e:
+    except toolkit.ValidationError as e:
         log.warning('Could not purge organization {0}. Error message states {1}'.format(id, e))
-        #log.error(e, exc_info=True)
+        # log.error(e, exc_info=True)
+
 
 def delete_all_orgs(context, delete_active=False):
     try:
-        #TODO: find a way to list also orgs in state 'deleted'. For now, I don't get them...
-        orgs = toolkit.get_action('organization_list')(context.copy(), {'all_fields':True})
+        # TODO: find a way to list also orgs in state 'deleted'. For now, I don't get them...
+        orgs = toolkit.get_action('organization_list')(context.copy(), {'all_fields': True})
         for org in orgs:
-            if org['state'] =='deleted' or delete_active:
+            if org['state'] == 'deleted' or delete_active:
                 delete(context, org['id'])
-    except Exception, e:
+    except Exception as e:
         log.error(e, exc_info=True)
+
 
 def organization_set_member_or_create(context, user_id, org_id, role):
     """
     Set user as member of the organization, with the given role.
     If the organization doesn't exist, create the organization, setting only it's ID. The remaining information will
     be completed on next full sync (paster command)
-    :param self:
+    :param context:
     :param user_id:
     :param org_id:
     :param role:
@@ -104,7 +106,7 @@ def organization_set_member_or_create(context, user_id, org_id, role):
     """
     try:
         toolkit.get_action('organization_member_create')(context.copy(), {'id': org_id, 'username': user_id,
-                                                                               'role': role})
+                                                                          'role': role})
         log.debug("added user to {0}".format(org_id))
 
     except toolkit.ValidationError:
@@ -113,7 +115,8 @@ def organization_set_member_or_create(context, user_id, org_id, role):
         toolkit.get_action('organization_create')(context.copy(), {'name': org_id})
         log.debug("adding user to {0}".format(org_id))
         toolkit.get_action('organization_member_create')(context.copy(), {'id': org_id, 'username': user_id,
-                                                                               'role': role})
+                                                                          'role': role})
+
 
 def flush():
     model.Session.commit()
