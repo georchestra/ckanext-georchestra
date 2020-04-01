@@ -108,7 +108,6 @@ class GeorchestraPlugin(plugins.SingletonPlugin):
         headers = toolkit.request.headers
         # Headers are not case-sensitive, meaning we can get uppercased of camel-cased headers => we lower-case them
         headers = {k.lower():v for k,v in headers.items()}
-        log.debug("headers {}".format(', '.join(map(str, headers))))
         username = headers.get(HEADER_USERNAME)
         if not username:
             toolkit.c.user = None
