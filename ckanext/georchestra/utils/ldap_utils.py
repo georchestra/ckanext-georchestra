@@ -5,6 +5,7 @@ import dateutil
 import re
 import six
 import base64
+from collections import OrderedDict
 
 import ldap, ldap.filter
 from ldap.controls.libldap import SimplePagedResultsControl
@@ -13,12 +14,18 @@ from ckan.plugins.toolkit import config
 
 log = logging.getLogger()
 
-def get_ldap_roles_list(prefix=''):
-    ldap_roles_dict = {
-        prefix + config['ckanext.georchestra.role.sysadmin']: u'sysadmin',
-        prefix + config['ckanext.georchestra.role.orgadmin']: u'admin',
-        prefix + config['ckanext.georchestra.role.editor']: u'editor'
-    }
+def get_ldap_roles_as_ordereddict(prefix=''):
+    """
+    Get a mapping between ROLES as defined by geOrchestra, and user roles as defined in CKAN
+    :param prefix: depending on the circumstances, the geOrchestra role will be prefixed by 'ROLE_' or not. Defaults to
+    ''
+    :return: OrderedDict starting with higher credential level
+    """
+    ldap_roles_dict = OrderedDict([
+            (prefix + config['ckanext.georchestra.role.sysadmin'], 'sysadmin'),
+            (prefix + config['ckanext.georchestra.role.orgadmin'], 'admin'),
+            (prefix + config['ckanext.georchestra.role.editor'], 'editor')
+        ])
     return ldap_roles_dict
 
 class GeorchestraLdap():
@@ -251,7 +258,7 @@ class GeorchestraLdap():
         """
         Add role information from LDAP
         Warning : does not support pagination: we suppose a given user will have less than 1000 roles !
-        :param user:
+        :param user: (dn, attr) tuple returned by LDAP search
         :return: formatted user dict, compliant with CKAN
         """
         dn, attr = user
@@ -271,35 +278,35 @@ class GeorchestraLdap():
                      'role': 'member'
                     }
 
-        ldap_roles_dict = {
-            config['ckanext.georchestra.role.sysadmin']: 'sysadmin',
-            config['ckanext.georchestra.role.orgadmin']: 'admin',
-            config['ckanext.georchestra.role.editor']: 'editor'
-        }
+        ldap_roles_dict = get_ldap_roles_as_ordereddict ()
 
         try:
-            for m in attr['memberOf']:
-                # get roles
+            # get ckan role
+            # extract only the role label (cn) from the memberOf list
+            search_string = u'cn=(.*),{0},{1}'.format(config['ckanext.georchestra.ldap.roles.rdn'],
+                                                      config['ckanext.georchestra.ldap.base_dn'])
+            roles_re = [ re.findall(search_string, m, re.U)[0]
+                         for m in attr[u'memberOf'] if config['ckanext.georchestra.ldap.roles.rdn'] in m ]
+            # we iterate from the highest level to the lowest, so that if multiple roles are declared, we get the
+            # highest
+            for k, v in ldap_roles_dict.iteritems():
+                if k in roles_re:
+                    user_dict['role'] = v
+                    user_dict['sysadmin'] = (v=='sysadmin')
+                    break
 
-                role_re = re.search(u'cn=(.*),{0},{1}'.format(config['ckanext.georchestra.ldap.roles.rdn'],
-                                                             config['ckanext.georchestra.ldap.base_dn']), m, re.U)
-                if role_re:
-                    rolename = role_re.group(1)
-                    try:
-                        # If this command works, it means the role is listed in the dict, hence CKAN role-related
-                        r = ldap_roles_dict[rolename]
-                        user_dict['role'] = r
-                        user_dict['sysadmin'] = (r=='sysadmin')
-                    except KeyError:
-                        # means it is not CKAN roles-related membership. No interest for us. Not an error, though
-                        pass
-                # get the organization he is member of (if there is)
-                org_re = re.search(u'cn=(.*),{0},{1}'.format(config['ckanext.georchestra.ldap.orgs.rdn'],
-                                                             config['ckanext.georchestra.ldap.base_dn']), m, re.U)
-                if org_re:
-                    orgname = org_re.group(1)
-                    user_dict['org_id'] = sanitize(orgname)
+            # get the organization he is member of (if there is)
+            # extract only the org label (cn) from the memberOf list
+            search_string = u'cn=(.*),{0},{1}'.format(config['ckanext.georchestra.ldap.orgs.rdn'],
+                                                      config['ckanext.georchestra.ldap.base_dn'])
+            orgs_re = [re.findall(search_string, m, re.U)[0]
+                        for m in attr[u'memberOf'] if config['ckanext.georchestra.ldap.orgs.rdn'] in m]
 
+            if orgs_re:
+                # get the first listed organization
+                # TODO : we should deal with possibility that the user belongs to several orgs
+                orgname = orgs_re[0]
+                user_dict['org_id'] = sanitize(orgname)
         except KeyError as e:
             # means is not member of anything
             pass

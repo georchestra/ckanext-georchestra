@@ -108,7 +108,6 @@ class GeorchestraPlugin(plugins.SingletonPlugin):
         headers = toolkit.request.headers
         # Headers are not case-sensitive, meaning we can get uppercased of camel-cased headers => we lower-case them
         headers = {k.lower():v for k,v in headers.items()}
-        log.debug("headers {}".format(', '.join(map(str, headers))))
         username = headers.get(HEADER_USERNAME)
         if not username:
             toolkit.c.user = None
@@ -120,15 +119,18 @@ class GeorchestraPlugin(plugins.SingletonPlugin):
         lastname = headers.get(HEADER_LASTNAME) or u'doe'
         roles = headers.get(HEADER_ROLES)
         org = ldap_utils.sanitize(headers.get(HEADER_ORG))
+
+        # define role for user (default is unprivileged 'member'
         role = u'member' # default
         prefix = config['ckanext.georchestra.role.prefix']
-        ldap_roles_dict = ldap_utils.get_ldap_roles_list(prefix)
+        ldap_roles_dict = ldap_utils.get_ldap_roles_as_ordereddict(prefix)
         if roles:
-            for r in roles.split(";"):
-                if r in ldap_roles_dict:
-                    role = ldap_roles_dict[r]
+            for k, v in ldap_roles_dict.iteritems():
+                if k in roles.split(";"):
+                    role = v
                     break
         log.debug('identified user {0} with role {1}'.format(username, role))
+
         userdict = {
             'id': username,
             'email': email,
