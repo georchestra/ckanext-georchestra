@@ -2,6 +2,7 @@
 
 import logging
 import six
+import traceback
 from routes.mapper import SubMapper
 from os import environ
 
@@ -14,13 +15,15 @@ import ckanext.georchestra.utils.organizations as organizations_utils
 import ckanext.georchestra.utils.users as user_utils
 import ckanext.georchestra.utils.ldap_utils as ldap_utils
 
-HEADER_USERNAME = "sec-username"
-HEADER_ROLES = "sec-roles"
-HEADER_ORG = "sec-org"
-HEADER_EMAIL = "sec-email"
-HEADER_FIRSTNAME = "sec-firstname"
-HEADER_LASTNAME = "sec-lastname"
-HEADER_TEL = "sec-tel"
+go_headers = {
+    'HEADER_USERNAME': u'sec-username',
+    'HEADER_ROLES': u'sec-roles',
+    'HEADER_ORG': u'sec-org',
+    'HEADER_EMAIL': u'sec-email',
+    'HEADER_FIRSTNAME': u'sec-firstname',
+    'HEADER_LASTNAME': u'sec-lastname',
+    'HEADER_TEL': u'sec-tel',
+}
 
 CONFIG_FROM_ENV_VARS = {
     'ckanext.georchestra.ldap.uri': 'CKAN_LDAP_URL',
@@ -107,18 +110,18 @@ class GeorchestraPlugin(plugins.SingletonPlugin):
 
         headers = toolkit.request.headers
         # Headers are not case-sensitive, meaning we can get uppercased of camel-cased headers => we lower-case them
-        headers = {k.lower():v for k,v in headers.items()}
-        username = headers.get(HEADER_USERNAME)
+        sec_headers = {k.lower():v for k,v in headers.items() if k.lower() in go_headers.values()}
+        username = sec_headers.get(go_headers['HEADER_USERNAME'])
         if not username:
             toolkit.c.user = None
             return
 
         username = ldap_utils.sanitize(username)
-        email = headers.get(HEADER_EMAIL) or u'empty@empty.org'
-        firstname = headers.get(HEADER_FIRSTNAME) or u'john'
-        lastname = headers.get(HEADER_LASTNAME) or u'doe'
-        roles = headers.get(HEADER_ROLES)
-        org = ldap_utils.sanitize(headers.get(HEADER_ORG))
+        email = sec_headers.get(go_headers['HEADER_EMAIL']) or u'empty@empty.org'
+        firstname = sec_headers.get(go_headers['HEADER_FIRSTNAME']) or u'john'
+        lastname = sec_headers.get(go_headers['HEADER_LASTNAME']) or u'doe'
+        roles = sec_headers.get(go_headers['HEADER_ROLES'])
+        org = ldap_utils.sanitize(sec_headers.get(go_headers['HEADER_ORG']))
 
         # define role for user (default is unprivileged 'member'
         role = u'member' # default
@@ -248,30 +251,34 @@ class GeorchestraPlugin(plugins.SingletonPlugin):
         :param role:
         :return:
         """
-        model = self.context['model']
-        q = model.Session.query(model.Member, model.Group) \
-            .filter(model.Member.table_name == 'user') \
-            .filter(model.Member.table_id == user_id) \
-            .filter(model.Member.state == 'active') \
-            .join(model.Group)
-        his_org=None
-        for member, group in q.all():
-            log.debug('user {0} is member of {1} with role {2}'.format(user_id, group.id, member.capacity))
-            if (group.id == org_id) or (group.name == org_id):
-                his_org = model_dictize.group_dictize(group, self.context)
-                if member.capacity != role:
-                    log.debug("found {0}. Update membership".format(org_id))
-                    organizations_utils.organization_set_member_or_create(self.context.copy(), user_id, org_id, role)
+        try:
+            model = self.context['model']
+            # Get all groups where user is a member
+            q = model.Session.query(model.Member, model.Group) \
+                .filter(model.Member.table_name == 'user') \
+                .filter(model.Member.table_id == user_id) \
+                .filter(model.Member.state == 'active') \
+                .join(model.Group)
+            his_org=None
+            for member, group in q.all():
+                log.debug('user {0} is member of {1} with role {2}'.format(user_id, group.id, member.capacity))
+                if (group.id == org_id) or (group.name == org_id):
+                    his_org = model_dictize.group_dictize(group, self.context)
+                    if member.capacity != role:
+                        log.debug("found {0}. Update membership".format(org_id))
+                        organizations_utils.organization_set_member_or_create(self.context.copy(), user_id, org_id, role)
+                    else:
+                        log.debug("found {0}. Membership OK".format(org_id))
                 else:
-                    log.debug("found {0}. Membership OK".format(org_id))
-            else:
-                log.debug("remove user from {0}".format(group.id))
-                toolkit.get_action('organization_member_delete')(self.context.copy(), {'id': group.id,
-                                                                                  'username': user_id})
+                    log.debug("remove user from {0}".format(group.id))
+                    toolkit.get_action('organization_member_delete')(self.context.copy(), {'id': group.id,
+                                                                                      'username': user_id})
 
-        if his_org is None:
-            organizations_utils.organization_set_member_or_create(self.context, user_id, org_id, role)
-
+            if his_org is None:
+                organizations_utils.organization_set_member_or_create(self.context, user_id, org_id, role)
+        except Exception as e:
+            log.debug("Exception {}".format(e))
+            log.debug(traceback.format_exc())
 
 class ConfigError(Exception):
     pass
