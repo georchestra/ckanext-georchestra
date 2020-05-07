@@ -152,7 +152,7 @@ class GeorchestraPlugin(plugins.SingletonPlugin):
 
             # TODO don't check at every call find a way to store the info it was already synced
             # Check if the user needs to be updated
-            check_fields = ['name', 'email', 'fullname', 'sysadmin', 'state']
+            check_fields = ['name', 'email', 'sysadmin', 'state']
             if user_utils.needs_updating(check_fields, ckan_user, userdict):
                 ckan_user = toolkit.get_action('user_update')(self.context, userdict)
                 log.debug("updated user {0}".format(userdict['name']))
