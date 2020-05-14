@@ -44,8 +44,8 @@ class GeorchestraPlugin(plugins.SingletonPlugin):
     plugins.implements(plugins.IAuthenticator)
     plugins.implements(plugins.IConfigurable)
     plugins.implements(plugins.IConfigurer)
-    plugins.implements(plugins.IAuthFunctions)
     plugins.implements(plugins.IRoutes, inherit=True)
+
 
     def update_config(self, config):
 
@@ -88,7 +88,7 @@ class GeorchestraPlugin(plugins.SingletonPlugin):
         """
         # Retrieve security-proxy headers, and specifically sec-username. Security-proxy headers are not case-sensitive,
         # meaning we can get uppercased of camel-cased headers => we lower-case them
-        sec_headers = {k.lower():v for k,v in toolkit.request.headers.items() if k.lower() in go_headers.values()}
+        sec_headers = _get_lowercased_sec_headers(toolkit.request.headers)
         username = sec_headers.get(go_headers['HEADER_USERNAME'])
         if not username:
             # be anonymous
@@ -113,7 +113,9 @@ class GeorchestraPlugin(plugins.SingletonPlugin):
         # User exists in LDAP, but not (yet) on CKAN. We need to create the user in the DB. It will be a temporary,
         # light user instance, that will be completed on next sync
         userdict = _user_dict_from_sec_headers(sec_headers)
-        ckan_user = user_utils.create(self.context, userdict)
+        user = toolkit.get_action('get_site_user')({'ignore_auth': True}, {})
+        context = {'user': user['name']}
+        ckan_user = user_utils.create(context, userdict)
         if not userobj:
             # There was an error. Log the info, and be anonymous
             log.warning('There was an error creating the user. Logging you as anonymous.')
@@ -230,7 +232,19 @@ class GeorchestraPlugin(plugins.SingletonPlugin):
 class ConfigError(Exception):
     pass
 
+
+def _get_lowercased_sec_headers(headers):
+    sec_headers = {k.lower(): v for k, v in headers.items() if k.lower() in go_headers.values()}
+    return sec_headers
+
+
 def _user_dict_from_sec_headers(sec_headers):
+    # It seems we might sometimes get headers encoded in ISO. This should get them back to unicode
+    for k,v in sec_headers.items():
+        if isinstance(v, str):
+            sec_headers[k] = six.text_type(v, encoding='latin1')
+
+    username = ldap_utils.sanitize(sec_headers.get(go_headers['HEADER_USERNAME']))
     email = sec_headers.get(go_headers['HEADER_EMAIL']) or u'empty@empty.org'
     firstname = sec_headers.get(go_headers['HEADER_FIRSTNAME']) or u'john'
     lastname = sec_headers.get(go_headers['HEADER_LASTNAME']) or u'doe'
@@ -254,15 +268,18 @@ def _user_dict_from_sec_headers(sec_headers):
     }
     return userdict
 
+
 def _allowed_auth_methods(v):
     """Raise an exception if the value is not an allowed authentication method"""
     if v.upper() not in ['SIMPLE', 'SASL']:
         raise ConfigError('Only SIMPLE and SASL authentication methods are supported')
 
+
 def _allowed_auth_mechanisms(v):
     """Raise an exception if the value is not an allowed authentication mechanism"""
     if v.upper() not in ['DIGEST-MD5',]:  # Only DIGEST-MD5 is supported when the auth method is SASL
         raise ConfigError('Only DIGEST-MD5 is supported as an authentication mechanism')
+
 
 def _get_from_environment(key):
     env_var_name = CONFIG_FROM_ENV_VARS.get(key, '')
