@@ -46,7 +46,6 @@ class GeorchestraPlugin(plugins.SingletonPlugin):
     plugins.implements(plugins.IConfigurer)
     plugins.implements(plugins.IRoutes, inherit=True)
 
-
     def update_config(self, config):
 
         # Add this plugin's templates dir to CKAN's extra_template_paths, so
@@ -89,7 +88,8 @@ class GeorchestraPlugin(plugins.SingletonPlugin):
         # Retrieve security-proxy headers, and specifically sec-username. Security-proxy headers are not case-sensitive,
         # meaning we can get uppercased of camel-cased headers => we lower-case them
         sec_headers = _get_lowercased_sec_headers(toolkit.request.headers)
-        username = sec_headers.get(go_headers['HEADER_USERNAME'])
+        userdict = _user_dict_from_sec_headers(sec_headers)
+        username = userdict['name']
         if not username:
             # be anonymous
             toolkit.c.user = None
@@ -101,18 +101,26 @@ class GeorchestraPlugin(plugins.SingletonPlugin):
         # Check if username exists in the db
         userobj = model.User.by_name(username)
         if userobj:
-            # User identified, we're done here
+            # User identified
             toolkit.c.user = userobj.name
             toolkit.c.user_obj = userobj
-            return
-            # TODO maybe check the org has not changed
+            if (userobj.sysadmin):
+                # User identified, we're done here
+                return
+            
+            # For non-sysadmins, we also want to check he is still member of the org declared in the headers
+            if self.organization_check_for_user(userobj.id, userdict['org_id'], userdict['role']):
+                # no change with org, we're done here
+                return
+            else:
+                organizations_utils.organization_set_member_or_create(self.context.copy(),
+                                                                      userobj.id, userdict['org_id'], userdict['role'])
 
         # (else:)
         log.debug('User {0} does not have an account yet in ckan. Creating the user'.format(username))
         # userobj = None means:
         # User exists in LDAP, but not (yet) on CKAN. We need to create the user in the DB. It will be a temporary,
         # light user instance, that will be completed on next sync
-        userdict = _user_dict_from_sec_headers(sec_headers)
         user = toolkit.get_action('get_site_user')({'ignore_auth': True}, {})
         context = {'user': user['name']}
         ckan_user = user_utils.create(context, userdict)
@@ -187,7 +195,27 @@ class GeorchestraPlugin(plugins.SingletonPlugin):
         if len(errors):
             raise ConfigError("\n".join(errors))
 
-    def organization_sync_for_user(self, user_id, org_id, role):
+
+    def organization_check_for_user(self, user_id, org_name, user_role):
+        """
+            Check if the user belongs to that group in CKAN, with corresponding role
+            :param user_id
+            :param org_name  the name of the org, provided by sec-headers
+            :param user_role
+            :return: boolean
+        """
+        memberships = model.Session.query(model.Member, model.Group) \
+            .filter(model.Member.table_name == 'user') \
+            .filter(model.Member.state == 'active') \
+            .filter(model.Member.table_id == user_id) \
+            .filter(model.Member.capacity == user_role) \
+            .join(model.Group)
+        for member, group in memberships.all():
+            if group.type == 'organization' and group.name == org_name:
+                return True
+        return False
+
+    def organization_sync_for_user(self, user_dict):
         """
         Synchronize on-the-fly organization membership. If organization does not exist, it creates an org with only
         the name (id). The empty title field will serve to know, at next full sync, that this org needs to be updated
