@@ -107,7 +107,7 @@ class GeorchestraPlugin(plugins.SingletonPlugin):
             if (userobj.sysadmin):
                 # User identified, we're done here
                 return
-            
+
             # For non-sysadmins, we also want to check he is still member of the org declared in the headers
             if self.organization_check_for_user(userobj.id, userdict['org_id'], userdict['role']):
                 # no change with org, we're done here
