@@ -22,11 +22,24 @@ def get_ldap_roles_as_ordereddict(prefix=''):
     :return: OrderedDict starting with higher credential level
     """
     ldap_roles_dict = OrderedDict([
-            (prefix + config['ckanext.georchestra.role.sysadmin'], 'sysadmin'),
-            (prefix + config['ckanext.georchestra.role.orgadmin'], 'admin'),
-            (prefix + config['ckanext.georchestra.role.editor'], 'editor')
+            (prefix + config['ckanext.georchestra.role.sysadmin'], u'sysadmin'),
+            (prefix + config['ckanext.georchestra.role.orgadmin'], u'admin'),
+            (prefix + config['ckanext.georchestra.role.editor'], u'editor')
         ])
     return ldap_roles_dict
+
+
+def get_ckan_role_from_security_proxy_roles(sec_roles):
+    # define role for user (default is unprivileged 'member')
+    role = u'member'  # default
+    # security-proxy adds a prefix in front of the LDAP roles
+    prefix = config['ckanext.georchestra.role.prefix']
+    ldap_roles_dict = get_ldap_roles_as_ordereddict(prefix)
+    if sec_roles:
+        for key, role in ldap_roles_dict.iteritems():
+            if key in sec_roles.split(";"):
+                return role
+
 
 class GeorchestraLdap():
     cnx = None

@@ -96,3 +96,14 @@ From geOrchestra 19.04 on, CKAN requires that the SP **allowSemicolon** setting 
 https://github.com/georchestra/datadir/blob/e625656eaa47cb50a36c406dacd11f18d2217307/security-proxy/security-proxy.properties#L170-L172. This is to allow fanstatic URLs
 
 
+## Running tests
+Look at the [test.ini](https://github.com/georchestra/ckanext-georchestra/blob/master/test.ini) file, you might need to 
+adjust it, as wel as the imported `test-core.ini` file (you can get it in your ckan source code. Copy it somewhere, 
+adjust the values to your case, update the path in your test.ini file)
+Read also [Testing CKAN](https://docs.ckan.org/en/2.8/contributing/test.html). If you can't run the CKAN core tests, 
+you probably won't be able to run this extension's tests.
+
+Run the tests:
+```
+nosetests --ckan --with-pylons=test.ini ckanext/georchestra/tests
+```

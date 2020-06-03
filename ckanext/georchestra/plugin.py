@@ -32,15 +32,6 @@ CONFIG_FROM_ENV_VARS = {
 
 log = logging.getLogger(__name__)
 
-def organization_edit(context, data_dict=None):
-    return {'success': False,
-            'msg': 'Managed by geOrchestra LDAP console'}
-
-def user_edit(context, data_dict=None):
-    return {'success': False,
-            'msg': 'Managed by geOrchestra LDAP console'}
-
-
 
 class GeorchestraPlugin(plugins.SingletonPlugin):
     """
@@ -53,17 +44,7 @@ class GeorchestraPlugin(plugins.SingletonPlugin):
     plugins.implements(plugins.IAuthenticator)
     plugins.implements(plugins.IConfigurable)
     plugins.implements(plugins.IConfigurer)
-    plugins.implements(plugins.IAuthFunctions)
     plugins.implements(plugins.IRoutes, inherit=True)
-    #TODO improve IConfigurer implementation ?
-
-
-    def get_auth_functions(self):
-        """Implementation of IAuthFunctions.get_auth_functions"""
-        return {
-            #'organization_update': organization_edit,
-            #'user_update':user_edit
-        }
 
     def update_config(self, config):
 
@@ -104,77 +85,53 @@ class GeorchestraPlugin(plugins.SingletonPlugin):
         Used to determine the currently logged in user
         Will first check if a username is available and act accordingly (get existing user, create new one)
         """
-        user = toolkit.get_action('get_site_user')({'ignore_auth': True}, {})
-        self.site_user_name = user['name']
-        self.context = {'user': user['name']}
-
-        headers = toolkit.request.headers
-        # Headers are not case-sensitive, meaning we can get uppercased of camel-cased headers => we lower-case them
-        sec_headers = {k.lower():v for k,v in headers.items() if k.lower() in go_headers.values()}
-        username = sec_headers.get(go_headers['HEADER_USERNAME'])
+        # Retrieve security-proxy headers, and specifically sec-username. Security-proxy headers are not case-sensitive,
+        # meaning we can get uppercased of camel-cased headers => we lower-case them
+        sec_headers = _get_lowercased_sec_headers(toolkit.request.headers)
+        userdict = _user_dict_from_sec_headers(sec_headers)
+        username = userdict['name']
         if not username:
+            # be anonymous
             toolkit.c.user = None
             return
 
+        # make sure username will be compatible with CKAN syntax
         username = ldap_utils.sanitize(username)
-        email = sec_headers.get(go_headers['HEADER_EMAIL']) or u'empty@empty.org'
-        firstname = sec_headers.get(go_headers['HEADER_FIRSTNAME']) or u'john'
-        lastname = sec_headers.get(go_headers['HEADER_LASTNAME']) or u'doe'
-        roles = sec_headers.get(go_headers['HEADER_ROLES'])
-        org = ldap_utils.sanitize(sec_headers.get(go_headers['HEADER_ORG']))
 
-        # define role for user (default is unprivileged 'member'
-        role = u'member' # default
-        prefix = config['ckanext.georchestra.role.prefix']
-        ldap_roles_dict = ldap_utils.get_ldap_roles_as_ordereddict(prefix)
-        if roles:
-            for k, v in ldap_roles_dict.iteritems():
-                if k in roles.split(";"):
-                    role = v
-                    break
-        log.debug('identified user {0} with role {1}'.format(username, role))
+        # Check if username exists in the db
+        userobj = model.User.by_name(username)
+        if userobj:
+            # User identified
+            toolkit.c.user = userobj.name
+            toolkit.c.user_obj = userobj
+            if (userobj.sysadmin):
+                # User identified, we're done here
+                return
 
-        userdict = {
-            'id': username,
-            'email': email,
-            'name': username,
-            'fullname': firstname + ' ' + lastname,
-            'password': u'12345678',
-            'org_id': org,
-            'role': role,
-            'sysadmin': (role==u'sysadmin'),
-            'state': u'active'
-        }
-        try:
-            # get the user info. If it does not exist, it will throw an exception. We then create the user in when
-            # dealing with that exception (see below)
-            ckan_user = toolkit.get_action('user_show')(self.context, {'id': userdict['name']})
-
-            # TODO don't check at every call find a way to store the info it was already synced
-            # Check if the user needs to be updated
-            check_fields = ['name', 'email', 'sysadmin', 'state']
-            if user_utils.needs_updating(check_fields, ckan_user, userdict):
-                ckan_user = toolkit.get_action('user_update')(self.context, userdict)
-                log.debug("updated user {0}".format(userdict['name']))
+            # For non-sysadmins, we also want to check he is still member of the org declared in the headers
+            if self.organization_check_for_user(userobj.id, userdict['org_id'], userdict['role']):
+                # no change with org, we're done here
+                return
             else:
-                log.debug("user {0} is up-to-date".format(userdict['name']))
-            if userdict['org_id']:
-                if role == 'sysadmin':
-                    # if sysadmin, we only need to check if the org needs to be created
-                    try:
-                        toolkit.get_action('organization_create')(self.context.copy(), {'name': userdict['org_id']})
-                    except Exception, e:
-                        # organization most likely exists, which will fail the create action. We ignore this.
-                        pass
-                else:
-                    # check if user membership needs updating and if needs organization to be created
-                    self.organization_sync_for_user(userdict['id'], userdict['org_id'], userdict['role'])
-        except toolkit.ObjectNotFound:
-            # Means the user doesn't exist yet => we create it
-            user_utils.create(self.context, userdict)
+                organizations_utils.organization_set_member_or_create(self.context.copy(),
+                                                                      userobj.id, userdict['org_id'], userdict['role'])
 
-        toolkit.c.user = username
-        #toolkit.c.user_obj = ckan_user # seems not necessary. Raises an error when the user is new
+        # (else:)
+        log.debug('User {0} does not have an account yet in ckan. Creating the user'.format(username))
+        # userobj = None means:
+        # User exists in LDAP, but not (yet) on CKAN. We need to create the user in the DB. It will be a temporary,
+        # light user instance, that will be completed on next sync
+        user = toolkit.get_action('get_site_user')({'ignore_auth': True}, {})
+        context = {'user': user['name']}
+        ckan_user = user_utils.create(context, userdict)
+        if not userobj:
+            # There was an error. Log the info, and be anonymous
+            log.warning('There was an error creating the user. Logging you as anonymous.')
+            toolkit.c.user = None
+            return
+
+        toolkit.c.user = ckan_user['id']
+        return
 
 
     def configure(self, main_config):
@@ -238,7 +195,27 @@ class GeorchestraPlugin(plugins.SingletonPlugin):
         if len(errors):
             raise ConfigError("\n".join(errors))
 
-    def organization_sync_for_user(self, user_id, org_id, role):
+
+    def organization_check_for_user(self, user_id, org_name, user_role):
+        """
+            Check if the user belongs to that group in CKAN, with corresponding role
+            :param user_id
+            :param org_name  the name of the org, provided by sec-headers
+            :param user_role
+            :return: boolean
+        """
+        memberships = model.Session.query(model.Member, model.Group) \
+            .filter(model.Member.table_name == 'user') \
+            .filter(model.Member.state == 'active') \
+            .filter(model.Member.table_id == user_id) \
+            .filter(model.Member.capacity == user_role) \
+            .join(model.Group)
+        for member, group in memberships.all():
+            if group.type == 'organization' and group.name == org_name:
+                return True
+        return False
+
+    def organization_sync_for_user(self, user_dict):
         """
         Synchronize on-the-fly organization membership. If organization does not exist, it creates an org with only
         the name (id). The empty title field will serve to know, at next full sync, that this org needs to be updated
@@ -283,15 +260,54 @@ class GeorchestraPlugin(plugins.SingletonPlugin):
 class ConfigError(Exception):
     pass
 
+
+def _get_lowercased_sec_headers(headers):
+    sec_headers = {k.lower(): v for k, v in headers.items() if k.lower() in go_headers.values()}
+    return sec_headers
+
+
+def _user_dict_from_sec_headers(sec_headers):
+    # It seems we might sometimes get headers encoded in ISO. This should get them back to unicode
+    for k,v in sec_headers.items():
+        if isinstance(v, str):
+            sec_headers[k] = six.text_type(v, encoding='latin1')
+
+    username = ldap_utils.sanitize(sec_headers.get(go_headers['HEADER_USERNAME']))
+    email = sec_headers.get(go_headers['HEADER_EMAIL']) or u'empty@empty.org'
+    firstname = sec_headers.get(go_headers['HEADER_FIRSTNAME']) or u'john'
+    lastname = sec_headers.get(go_headers['HEADER_LASTNAME']) or u'doe'
+    roles = sec_headers.get(go_headers['HEADER_ROLES'])
+    org = ldap_utils.sanitize(sec_headers.get(go_headers['HEADER_ORG']))
+
+    # define role for user (default is unprivileged 'member'
+    role = ldap_utils.get_ckan_role_from_security_proxy_roles(roles)
+    log.debug('Giving user {0} role {1}'.format(username, role))
+
+    userdict = {
+        'id': username,
+        'email': email,
+        'name': username,
+        'fullname': firstname + ' ' + lastname,
+        'password': u'12345678',
+        'org_id': org,
+        'role': role,
+        'sysadmin': (role == u'sysadmin'),
+        'state': u'active'
+    }
+    return userdict
+
+
 def _allowed_auth_methods(v):
     """Raise an exception if the value is not an allowed authentication method"""
     if v.upper() not in ['SIMPLE', 'SASL']:
         raise ConfigError('Only SIMPLE and SASL authentication methods are supported')
 
+
 def _allowed_auth_mechanisms(v):
     """Raise an exception if the value is not an allowed authentication mechanism"""
     if v.upper() not in ['DIGEST-MD5',]:  # Only DIGEST-MD5 is supported when the auth method is SASL
         raise ConfigError('Only DIGEST-MD5 is supported as an authentication mechanism')
+
 
 def _get_from_environment(key):
     env_var_name = CONFIG_FROM_ENV_VARS.get(key, '')
