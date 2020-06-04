@@ -2,11 +2,18 @@ language: python
 sudo: required
 python:
     - "2.7"
-addons:
-    postgresql: "11.2"
 services:
     - postgresql
     - redis-server
+before_install:
+  - sudo apt-get -y install solr-jetty
+addons:
+    postgresql: "11.2"
+    apt:
+        update: true
+        packages:
+            - postgresql-11
+            - postgresql-client-11
 install:
     - bash bin/travis-build.bash
     - pip install coveralls

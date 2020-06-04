@@ -5,9 +5,10 @@ echo "This is travis-build.bash..."
 
 echo "Installing the packages that CKAN requires..."
 sudo apt-get update -qq
-sudo apt-get install solr-jetty \
-                      libsasl2-dev \
-                      libldap2-dev
+sudo apt-get install solr-jetty
+
+echo "Updating pip"
+pip install --upgrade pip
 
 echo "Installing CKAN and its Python dependencies..."
 git clone https://github.com/ckan/ckan
@@ -17,6 +18,7 @@ cd ckan
 export latest_ckan_release_branch=2.8
 echo "CKAN branch: $latest_ckan_release_branch"
 git checkout $latest_ckan_release_branch
+pip install -r requirement-setuptools.txt
 python setup.py develop
 pip install -r requirements.txt
 pip install -r dev-requirements.txt
