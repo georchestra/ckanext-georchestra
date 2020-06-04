@@ -1,13 +1,29 @@
 language: python
+dist: bionic
 sudo: required
 python:
-    - "2.7"
+  - "2.7"
 services:
-    - postgresql
-    - redis-server
+  - postgresql
+  - redis-server
+addons:
+  apt:
+    update: true
+    sources:
+      - ppa:chris-lea/redis-server
+    packages:
+      - redis-tools
+      - redis-server
+  postgresql: "11"
+before_install:
+  - echo "Upgrade pip"
+  - pip install --upgrade pip
+  - echo "Install solr" && sudo apt-get -y install solr-jetty
+  - echo "Install ckan core"
+  - bash bin/travis-install-ckan.bash
 install:
-    - bash bin/travis-build.bash
-    - pip install coveralls
+  - bash bin/travis-build.bash
+  - pip install coveralls
 script: sh bin/travis-run.sh
 after_success:
-    - coveralls
+  - coveralls
