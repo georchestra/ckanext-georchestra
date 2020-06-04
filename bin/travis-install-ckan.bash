@@ -25,4 +25,3 @@ sed -i -e 's/solr_url.*/solr_url = http:\/\/127.0.0.1:8983\/solr/' test-core.ini
 
 echo "Initialising the database..."
 paster db init -c test-core.ini
-sudo cd $TRAVIS_BUILD_DIR
