@@ -20,7 +20,7 @@ git checkout $latest_ckan_release_branch
 python setup.py develop
 pip install -r requirements.txt
 pip install -r dev-requirements.txt
-cd ..
+cd $TRAVIS_BUILD_DIR
 
 echo "Creating the PostgreSQL user and database..."
 sudo -u postgres psql -c "CREATE USER ckan_default WITH PASSWORD 'pass';"
@@ -34,7 +34,7 @@ sed -i -e 's/solr_url.*/solr_url = http:\/\/127.0.0.1:8983\/solr/' ckan/test-cor
 echo "Initialising the database..."
 cd ckan
 paster db init -c test-core.ini
-cd -
+cd $TRAVIS_BUILD_DIR
 
 echo "Installing ckanext-georchestra and its requirements..."
 python setup.py develop
