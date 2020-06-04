@@ -12,6 +12,6 @@ echo "Moving test.ini into a subdir..."
 mkdir subdir
 mv test.ini subdir
 # update the path to test-core.ini
-sed -i -e 's|/usr/lib/ckan/lib/default/src/ckan/test-core.ini|ckan/test-core.ini|' subdir/test.ini
+sed -i -e 's|/usr/lib/ckan/lib/default/src/ckan/test-core.ini|../ckan/test-core.ini|' subdir/test.ini
 
 echo "travis-build.bash is done."
