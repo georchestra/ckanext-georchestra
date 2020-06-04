@@ -2,6 +2,8 @@ language: python
 sudo: required
 python:
     - "2.7"
+addons:
+    postgresql: "11.2"
 services:
     - postgresql
     - redis-server
