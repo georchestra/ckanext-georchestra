@@ -20,7 +20,7 @@ git checkout $latest_ckan_release_branch
 python setup.py develop
 pip install -r requirements.txt
 pip install -r dev-requirements.txt
-cd -
+cd ..
 
 echo "Creating the PostgreSQL user and database..."
 sudo -u postgres psql -c "CREATE USER ckan_default WITH PASSWORD 'pass';"
