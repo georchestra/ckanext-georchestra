@@ -6,8 +6,6 @@ python:
 services:
   - postgresql
   - redis-server
-before_install:
-  - sudo apt-get -y install solr-jetty
 addons:
   apt:
     update: true
@@ -20,6 +18,7 @@ addons:
 before_install:
   - echo "Upgrade pip"
   - pip install --upgrade pip
+  - echo "Install solr" && sudo apt-get -y install solr-jetty
   - echo "Install ckan core"
   - bash bin/travis-install-ckan.bash
 install:
