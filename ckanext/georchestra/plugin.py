@@ -28,6 +28,7 @@ go_headers = {
 CONFIG_FROM_ENV_VARS = {
     'ckanext.georchestra.ldap.uri': 'CKAN_LDAP_URL',
     'ckanext.georchestra.sync.force_update': 'CKAN_LDAP_SYNC_FORCE',
+    'ckanext.georchestra.orphans.users.purge': 'CKAN_LDAP_SYNC_ORPHANS_PURGE',
 }
 
 log = logging.getLogger(__name__)
