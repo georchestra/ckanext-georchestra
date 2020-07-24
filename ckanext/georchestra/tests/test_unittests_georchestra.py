@@ -70,6 +70,33 @@ class TestGeorchestraHeaders(unittest.TestCase):
         }
         self.assertDictEqual(user_dict, expected_dict)
 
+    def test_no_ckan_role_in_sec_headers_end_as_member_role(self):
+        '''Headers should be unicode
+        '''
+        sec_headers = {
+            'sec-roles': u'ROLE_GT_CHEMINS;ROLE_GN_ADMIN;ROLE_EXTRACTORAPP;ROLE_GN_EDITOR',
+            'sec-firstname': u'François',
+            'sec-email': u'fpomfont@pomfont.fr',
+            'sec-tel': u'03 74 00 00 00',
+            'sec-username': u'fpomfont',
+            'sec-lastname': u'Pomfont',
+            'sec-org': u'region_hdf',
+        }
+        from ckanext.georchestra.plugin import _user_dict_from_sec_headers
+        user_dict = _user_dict_from_sec_headers(sec_headers)
+        expected_dict = {
+            'sysadmin': False,
+            'state': u'active',
+            'role': u'member',
+            'name': u'fpomfont',
+            'fullname': u'François Pomfont',
+            'password': u'12345678',
+            'org_id': u'region_hdf',
+            'id': u'fpomfont',
+            'email': u'fpomfont@pomfont.fr'
+        }
+        self.assertDictEqual(user_dict, expected_dict)
+
     def test_sec_headers_latin1_produce_valid_userdict(self):
         '''It seems sometimes Pylons might return headers as latin1-encoded byte-strings
         '''

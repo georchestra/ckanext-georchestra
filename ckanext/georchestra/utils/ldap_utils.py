@@ -31,7 +31,7 @@ def get_ldap_roles_as_ordereddict(prefix=''):
 
 def get_ckan_role_from_security_proxy_roles(sec_roles):
     # define role for user (default is unprivileged 'member')
-    role = u'member'  # default
+    default_role = u'member'  # default
     # security-proxy adds a prefix in front of the LDAP roles
     prefix = config['ckanext.georchestra.role.prefix']
     ldap_roles_dict = get_ldap_roles_as_ordereddict(prefix)
@@ -39,6 +39,7 @@ def get_ckan_role_from_security_proxy_roles(sec_roles):
         for key, role in ldap_roles_dict.iteritems():
             if key in sec_roles.split(";"):
                 return role
+    return default_role
 
 
 class GeorchestraLdap():
