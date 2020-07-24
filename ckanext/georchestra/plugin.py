@@ -28,6 +28,7 @@ go_headers = {
 CONFIG_FROM_ENV_VARS = {
     'ckanext.georchestra.ldap.uri': 'CKAN_LDAP_URL',
     'ckanext.georchestra.sync.force_update': 'CKAN_LDAP_SYNC_FORCE',
+    'ckanext.georchestra.orphans.users.purge': 'CKAN_LDAP_SYNC_ORPHANS_PURGE',
 }
 
 log = logging.getLogger(__name__)
@@ -80,6 +81,11 @@ class GeorchestraPlugin(plugins.SingletonPlugin):
         """Implementation of IAuthenticator.abort"""
         return status_code, detail, headers, comment
 
+    def get_superuser_context(self):
+        user = toolkit.get_action('get_site_user')({'ignore_auth': True}, {})
+        context = {'user': user['name']}
+        return context
+
     def identify(self):
         """Implementation of IAuthenticator.identify
         Used to determine the currently logged in user
@@ -108,13 +114,15 @@ class GeorchestraPlugin(plugins.SingletonPlugin):
                 # User identified, we're done here
                 return
 
+            log.debug('Checking user {}, role {}, org {}'.format(userobj.id, userdict['role'], userdict['org_id']))
             # For non-sysadmins, we also want to check he is still member of the org declared in the headers
             if self.organization_check_for_user(userobj.id, userdict['org_id'], userdict['role']):
                 # no change with org, we're done here
                 return
             else:
-                organizations_utils.organization_set_member_or_create(self.context.copy(),
-                                                                      userobj.id, userdict['org_id'], userdict['role'])
+                log.debug('Needs to update user {}: set as {} role on org {}'.format(userobj.id, userdict['role'], userdict['org_id']))
+                organizations_utils.organization_set_member_or_create(self.get_superuser_context().copy(),
+                                                                     userobj.id, userdict['org_id'], userdict['role'])
 
         # (else:)
         log.debug('User {0} does not have an account yet in ckan. Creating the user'.format(username))
@@ -124,7 +132,7 @@ class GeorchestraPlugin(plugins.SingletonPlugin):
         user = toolkit.get_action('get_site_user')({'ignore_auth': True}, {})
         context = {'user': user['name']}
         ckan_user = user_utils.create(context, userdict)
-        if not userobj:
+        if not ckan_user:
             # There was an error. Log the info, and be anonymous
             log.warning('There was an error creating the user. Logging you as anonymous.')
             toolkit.c.user = None

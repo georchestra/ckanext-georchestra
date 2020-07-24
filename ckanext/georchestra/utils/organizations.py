@@ -96,7 +96,7 @@ def delete_all_orgs(context, delete_active=False):
 def organization_set_member_or_create(context, user_id, org_id, role):
     """
     Set user as member of the organization, with the given role.
-    If the organization doesn't exist, create the organization, setting only it's ID. The remaining information will
+    If the organization doesn't exist, create the organization, setting only its ID. The remaining information will
     be completed on next full sync (paster command)
     :param context:
     :param user_id:
@@ -110,7 +110,7 @@ def organization_set_member_or_create(context, user_id, org_id, role):
         log.debug("added user to {0}".format(org_id))
 
     except toolkit.ValidationError:
-        # Means it doesn't exist yet => we create it
+        # Means the org doesn't exist yet => we create it
         log.debug("Creating organization {0}".format(org_id))
         toolkit.get_action('organization_create')(context.copy(), {'name': org_id})
         log.debug("adding user to {0}".format(org_id))
