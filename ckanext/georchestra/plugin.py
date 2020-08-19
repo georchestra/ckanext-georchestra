@@ -107,6 +107,12 @@ class GeorchestraPlugin(plugins.SingletonPlugin):
         # Check if username exists in the db
         userobj = model.User.by_name(username)
         if userobj:
+            # User exists
+            # check if it needs an update
+            if _user_profile_needs_updating(userobj, userdict):
+                user = toolkit.get_action('user_update')(self.get_superuser_context().copy(), userdict)
+                userobj = model.User.by_name(username)
+
             # User identified
             toolkit.c.user = userobj.name
             toolkit.c.user_obj = userobj
@@ -292,15 +298,15 @@ def _user_dict_from_sec_headers(sec_headers):
     log.debug('Giving user {0} role {1}'.format(username, role))
 
     userdict = {
-        'id': username,
-        'email': email,
-        'name': username,
-        'fullname': firstname + ' ' + lastname,
-        'password': u'12345678',
-        'org_id': org,
-        'role': role,
-        'sysadmin': (role == u'sysadmin'),
-        'state': u'active'
+        u'id': username,
+        u'email': email,
+        u'name': username,
+        u'fullname': firstname + ' ' + lastname,
+        u'password': u'12345678',
+        u'org_id': org,
+        u'role': role,
+        u'sysadmin': (role == u'sysadmin'),
+        u'state': u'active'
     }
     return userdict
 
@@ -320,3 +326,21 @@ def _allowed_auth_mechanisms(v):
 def _get_from_environment(key):
     env_var_name = CONFIG_FROM_ENV_VARS.get(key, '')
     return environ.get(env_var_name, None)
+
+
+def _user_profile_needs_updating(userobj, userdict):
+    """
+    Check if significant parts of the user object have changed, between the userobject stored in DB and the user profile
+    retrieved from the headers
+    :param userobj: user definition stored in DB
+    :param userdict: user profile retrieved from the headers
+    :return: (boolean) True if the user profile need to be updated (there *is* some change)
+    """
+    attributes = [ u'sysadmin', u'state', u'id', u'name']
+    obj_dict = vars(userobj)
+    for att in attributes:
+        if obj_dict[att] != userdict[att]:
+            return True
+
+    # There is no significant change
+    return False
