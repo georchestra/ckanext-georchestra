@@ -1,0 +1,29 @@
+{% import 'macros/form.html' as form %}
+
+<form id='organization-edit-form' class="dataset-form" method="post" data-module="basic-form" enctype="multipart/form-data">
+  {% block error_summary %}
+    {{ form.errors(error_summary) }}
+  {% endblock %}
+
+  {% block basic_fields %}
+    {% set attrs = {'data-module': 'slug-preview-target', 'class': 'form-control'} %}
+    {{ form.input('title', label=_('Name'), id='field-name', placeholder=_('My Organization'), value=data.title, error=errors.title, classes=['control-full'], attrs={'readonly': '', 'class': 'form-control'}) }}
+
+    {%- set prefix = h.url_for(group_type + '_read', id='') -%}
+    {%- set domain = h.url_for(group_type + '_read', id='', qualified=true) -%}
+    {% set domain = domain|replace("http://", "")|replace("https://", "") %}
+    {% set attrs = {'data-module': 'slug-preview-slug', 'class': 'form-control ', 'data-module-prefix': domain, 'data-module-placeholder': '<' + group_type + '>'} %}
+
+    <div class="hidden"><!-- We keep it because we need to set data.name value but we hide it 'cause we don't want to be able to edit the slug-->
+      {{ form.prepend('name', label=_('URL'), prepend=prefix, id='field-url', placeholder=_('my-' + group_type), value=data.name, error=errors.name, attrs=attrs, is_required=true) }}
+    </div>
+
+    <div class="slug-preview form-group control-full">
+      <strong>URL:</strong>
+      <span class="slug-preview-prefix">{{ domain }}</span><span class="slug-preview-value">{{ data.name }}</span>
+    </div>
+
+  {% endblock %}
+
+
+</form>
