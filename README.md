@@ -192,18 +192,27 @@ To publish a new version to PyPI follow these steps:
 
     Fix any errors you get.
 
-5. Upload the source distribution to PyPI:
+5. Upload the source distribution to TestPyPI:
+
+    `twine upload --repository testpypi dist/*`
+    
+6. Check it, test it before pushing to PypI: you can load the package using pip:
+
+    `pip install --index-url https://test.pypi.org/simple/ ckanext-georchestra`
+    
+7. Upload the source distribution to PyPI:
 
     `twine upload dist/*`
 
-6.Commit any outstanding changes:
-```
+8. Commit any outstanding changes:
+
+    ```
     git commit -a
     git push
-```
+    ```
 
-7. Tag the new release of the project on GitHub with the version number from the setup.py file. For example if the version number in setup.py is 0.0.1 then do:
-```
+9. Tag the new release of the project on GitHub with the version number from the setup.py file. For example if the version number in setup.py is 0.0.1 then do:
+    ```
     git tag 0.2.0
     git push --tags
-```
+    ```
