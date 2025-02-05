@@ -1,5 +1,12 @@
 # ckanext-georchestra
 
+---
+## _**DEPRECATED**_
+
+For open-data UI experience, we recommend you use [Datahub](https://docs.georchestra.org/georchestra/admin_guide/datahub/) in your geOrchestra instance.
+
+---
+
 ## Presentation
 
 This ckan extension aims to integrate a CKAN instance into a geOrchestra deployment : it uses the geOrchestra LDAP 
